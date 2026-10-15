@@ -19,7 +19,7 @@
 
 [阅读截图](docs/images/reading.png) · [平板词库](docs/images/library.png) · [宿主验收记录](docs/ACCEPTANCE.md)
 
-Cloudflare MCP 地址规划为 `https://vocabulary-context.hellovian.workers.dev/mcp`。首次发布及验证状态见 [Cloudflare 指南](docs/CLOUDFLARE.md)。根网页介绍连接方法，学习 UI 在兼容宿主中打开。
+Cloudflare MCP 地址：[`https://vocab.hellovian.com/mcp`](https://vocab.hellovian.com/mcp)。根网页介绍连接方法，学习 UI 在兼容宿主中打开。首次部署和数据迁移状态见 [Cloudflare 指南](docs/CLOUDFLARE.md)。
 
 每个部署对应一份个人词库；公开代码不等于共享词库。请部署自己的实例并使用自己的登录密码。独立桌面、平板和 Voice 的支持以真实验收为准；浏览器协议测试不等于宿主安装验收。
 

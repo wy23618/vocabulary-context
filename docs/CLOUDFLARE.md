@@ -2,9 +2,9 @@
 
 ## 当前状态（2026-10-15）
 
-本地 41 项业务/认证/协议测试、19 项 UI 验收通过。Workers 打包通过；真实 Workers 运行时已验收 OAuth / PKCE、MCP 工具、词库写入、版本冲突回滚与 UI/Skill 资源读取。首次线上部署与现有词库迁移尚未完成。
+本地 41 项业务/认证/协议测试、19 项 UI 验收通过。Workers 打包通过；真实 Workers 运行时已验收 OAuth / PKCE、MCP 工具、词库写入、版本冲突回滚与 UI/Skill 资源读取。2026-10-15 已部署至 Cloudflare Workers，并完成 HTTPS、健康检查、匿名保护和词库备份导入验证。
 
-默认 MCP 目标：`https://vocabulary-context.hellovian.workers.dev/mcp`。此为部署目标，不代表服务已上线。
+正式 MCP 地址：[`https://vocab.hellovian.com/mcp`](https://vocab.hellovian.com/mcp)。备用入口：`https://vocabulary-context.hellovian.workers.dev/mcp`。`/health` 返回 200 且账号登录已配置，匿名 MCP 请求返回 401。
 
 ## 架构与发布
 
@@ -37,11 +37,11 @@ npm run deploy
 
 代码推送不携带 `data/`，因此首次新云库为空。本地词库不受部署影响。先用现有 `scripts/backup.mjs` 创建一致性备份并验证 manifest / SHA-256；迁移必须保留 words、events、objects、requests 的 ID、版本、文章与逐处释义，不能用“重新加词”替代完整恢复。
 
-新增 `cloudflare/migrate.mjs` 与独立维护通道支持空库恢复，已在 Workers 运行时验证约束失败回滚和重复导入拒绝。本地词库已生成一致性私有备份，并已在隔离 Workers 实例验证完整导入、SHA-256 回执及逐表行数一致；真实云端导入与重连仍待完成。OAuth 记录不随词库迁移，新服务应重新授权。
+新增 `cloudflare/migrate.mjs` 与独立维护通道支持空库恢复，已在 Workers 运行时验证约束失败回滚和重复导入拒绝。本地词库的一致性私有备份已导入全新的 Cloudflare Durable Object，并验证 SHA-256 回执和逐表行数一致。原 OAuth 授权记录未迁移，ChatGPT 或其他宿主需要在正式地址重新连接并授权。临时迁移凭据已立即从 Worker 删除。私有备份保留在被 Git 忽略的本地 `data/` 目录。
 
 ## 自动发布
 
-仓库的 `.github/workflows/deploy.yml` 在 pull request 执行检查，在 `main` 的 push / 手动运行检查通过后执行正式发布。请勿同时启用两个互相覆盖的发布系统。
+仓库的 `.github/workflows/deploy.yml` 在 pull request 执行检查，在 `main` 的 push / 手动运行检查通过后执行正式发布。检查任务已随首次推送启动；正式自动发布还需配置以下 GitHub Actions secrets。请勿同时启用两个互相覆盖的发布系统。
 
 需要在 GitHub 仓库 Settings → Secrets and variables → Actions 配置：
 

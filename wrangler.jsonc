@@ -5,9 +5,10 @@
   "compatibility_date":"2026-10-15",
   "compatibility_flags":["nodejs_compat"],
   "workers_dev":true,
+  "routes":[{"pattern":"vocab.hellovian.com","custom_domain":true}],
   "alias":{"node:sqlite":"./cloudflare/sqlite-unavailable.mjs"},
   "rules":[{"type":"Text","globs":["**/*.html","**/*.md","**/*.sql"],"fallthrough":true}],
   "durable_objects":{"bindings":[{"name":"VOCAB_LIBRARY","class_name":"VocabularyLibrary"}]},
   "migrations":[{"tag":"v1","new_sqlite_classes":["VocabularyLibrary"]}],
-  "vars":{"VOCAB_PUBLIC_URL":"https://vocabulary-context.hellovian.workers.dev","VOCAB_REDIRECT_URIS":"https://chatgpt.com/connector_platform_oauth_redirect"}
+  "vars":{"VOCAB_PUBLIC_URL":"https://vocab.hellovian.com","VOCAB_REDIRECT_URIS":"https://chatgpt.com/connector_platform_oauth_redirect"}
 }
