@@ -1,7 +1,7 @@
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const projectRoot=fileURLToPath(new URL('../',import.meta.url));
+const projectRoot=fileURLToPath(new URL('../',import.meta.url || 'file:///bundle/server/config.mjs'));
 
 export function loadConfig(env=process.env) {
   const port=Number(env.PORT||8787);

@@ -1,0 +1,3 @@
+VOCAB_PUBLIC_URL=http://127.0.0.1:8792
+VOCAB_OWNER_PASSWORD=choose-a-private-password-of-at-least-20-characters
+VOCAB_REDIRECT_URIS=https://chatgpt.com/connector_platform_oauth_redirect

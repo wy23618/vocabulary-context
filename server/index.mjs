@@ -14,7 +14,7 @@ import { loadConfig } from './config.mjs';
 export const UI_URI='ui://vocabulary-context/v6/reader.html';
 export const UI_COMPAT_URIS=['ui://vocabulary-context/v1/reader.html','ui://vocabulary-context/v2/reader.html','ui://vocabulary-context/v3/reader.html','ui://vocabulary-context/v4/reader.html','ui://vocabulary-context/v5/reader.html'];
 const workflow='All model work uses this host subscription. Stage manual/image word imports for reviewed confirmation. In enabled conversation practice, capture_conversation_word implements standing user authorization to collect words explicitly asked about or not understood: explain, capture with actual user evidence, and do not demand another import confirmation. For articles: first inspect open_workspace.active_generation or a supplied generation_id. Resume prepared tasks with get_generation and the SAME generation ID, including after a user authorizes a previously blocked UI request; reopen saved tasks without generating again. Only call prepare_article for a genuinely new article request; it freezes targets/config; write real prose; tokenize_article returns tokens[].index: send as word_map[].token_index; annotate content words with Chinese contextual definitions; validate_article, fix errors, save_article. Only saved article is success. Clicking definitions never changes levels. prepare_conversation is independent of reading; record only actual transcript. No API model calls. Image vision is done by host, then import_words_from_image stages real recognized items.';
-const skillPath=new URL('../skills/vocabulary-context/SKILL.md',import.meta.url);
+const skillPath=new URL('../skills/vocabulary-context/SKILL.md',import.meta.url || 'file:///bundle/server/index.mjs');
 const skillUri='skill://vocabulary-context/vocabulary-context/SKILL.md';
 
 export function createMcp(service,config) {
@@ -22,9 +22,9 @@ export function createMcp(service,config) {
   for(const [index,uri] of [UI_URI,...UI_COMPAT_URIS].entries()) {
     // Keep prior URIs readable for hosts with cached descriptors. Personal development
     // uses ChatGPT's default sandbox; the tunnel origin is not a hosted component domain.
-    server.registerResource(`vocabulary-context-ui-${index}`,uri,{mimeType:'text/html;profile=mcp-app'},async()=>({contents:[{uri,mimeType:'text/html;profile=mcp-app',text:readFileSync(new URL('../web/dist/widget.html',import.meta.url),'utf8'),_meta:{ui:{prefersBorder:false,csp:{connectDomains:[],resourceDomains:[]}},'openai/widgetPrefersBorder':false,'openai/widgetCSP':{connect_domains:[],resource_domains:[]},'openai/widgetDescription':'Personal vocabulary library and contextual reading. Data loading does not confirm the client displayed this component.','openai/ui':{availableDisplayModes:['inline','fullscreen']}}}]}));
+    server.registerResource(`vocabulary-context-ui-${index}`,uri,{mimeType:'text/html;profile=mcp-app'},async()=>({contents:[{uri,mimeType:'text/html;profile=mcp-app',text:config.readUi?config.readUi():readFileSync(new URL('../web/dist/widget.html',import.meta.url),'utf8'),_meta:{ui:{prefersBorder:false,csp:{connectDomains:[],resourceDomains:[]}},'openai/widgetPrefersBorder':false,'openai/widgetCSP':{connect_domains:[],resource_domains:[]},'openai/widgetDescription':'Personal vocabulary library and contextual reading. Data loading does not confirm the client displayed this component.','openai/ui':{availableDisplayModes:['inline','fullscreen']}}}]}));
   }
-  const skill=()=>readFileSync(skillPath,'utf8');
+  const skill=()=>config.readSkill?config.readSkill():readFileSync(skillPath,'utf8');
   const entry=()=>({uri:skillUri,frontmatter:{name:'vocabulary-context',description:'Learn postgraduate English vocabulary in natural reading and host conversation using your shared personal word library.'},resources:[{uri:skillUri,digest:`sha256:${createHash('sha256').update(skill()).digest('hex')}`} ]});
   server.registerResource('vocabulary-context-skill',skillUri,{mimeType:'text/markdown'},async()=>({contents:[{uri:skillUri,mimeType:'text/markdown',text:skill()}]}));
   server.server.setRequestHandler(z.object({method:z.literal('skills/list'),params:z.object({cursor:z.string().optional()}).optional()}),async()=>({skills:[entry()]}));
@@ -79,7 +79,7 @@ export function createRuntime(options={}) {
   app.use((error,_req,res,_next)=>res.status(error.status===413?413:400).json({error:'invalid_request',message:'输入过大或格式不正确。'}));
   return {app,service,config,close:async()=>{await Promise.all([...active].map(t=>t.close()));auth.close();service.close();}};
 }
-if(process.argv[1]&&fileURLToPath(import.meta.url)===process.argv[1]) {
+if(import.meta.url&&process.argv[1]&&fileURLToPath(import.meta.url)===process.argv[1]) {
   const runtime=createRuntime();const listener=runtime.app.listen(runtime.config.port,runtime.config.host,()=>{
     console.log(`Vocabulary Context MCP: ${runtime.config.publicUrl}/mcp`);
     console.log(`Data: ${runtime.config.dataDir}`);

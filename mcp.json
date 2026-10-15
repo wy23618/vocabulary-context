@@ -3,7 +3,7 @@
   "mcpServers": {
     "vocabulary-context": {
       "type": "streamable-http",
-      "url": "https://sponsored-gaps-transition-dare.trycloudflare.com/mcp"
+      "url": "https://vocabulary-context.hellovian.workers.dev/mcp"
     }
   }
 }

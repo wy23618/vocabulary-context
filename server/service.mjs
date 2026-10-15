@@ -36,8 +36,7 @@ const tokenize=text=>[...text.matchAll(/[\p{L}]+(?:['’\-][\p{L}]+)*/gu)].map(m
 const functionWords=new Set('a an the of to in on at by for with and or but if as that this these those it its is are was were be been being have has had do does did will would can could may might shall should must not no so than then there here i you he she we they me him her us them my your our their from into about through up out also both each any all some such which who whom whose what when where why how very more most less least just'.split(' '));
 const indexedTokens=article=>tokenize(article).map((t,index)=>({index,start:t.start,end:t.end,surface_form:t.text,requires_mapping:!functionWords.has(normalize(t.text))}));
 
-export function createService({dataDir=loadConfig().dataDir,now=()=>new Date(),random=Math.random}={}) {
-  const repository=new Repository(dataDir);
+export function createService({dataDir=loadConfig().dataDir,now=()=>new Date(),random=Math.random,repository=new Repository(dataDir)}={}) {
   const stamp=()=>new Date(now()).toISOString();
   let queue=Promise.resolve();
   const wordFor=wordId=>repository.word(wordId)??fail('WORD_NOT_FOUND','这个词已删除或不存在。');

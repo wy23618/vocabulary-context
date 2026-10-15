@@ -7,10 +7,10 @@ const random=()=>randomBytes(32).toString('base64url');
 const hash=x=>createHash('sha256').update(x).digest('hex');
 const equal=(a,b)=>{const x=Buffer.from(a),y=Buffer.from(b);return x.length===y.length&&timingSafeEqual(x,y);};
 const html=x=>String(x).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-export function createAuth({dataDir,publicUrl,ownerPassword,redirectUris,now=()=>Date.now()}) {
+export function createAuth({dataDir,publicUrl,ownerPassword,redirectUris,now=()=>Date.now(),database}) {
   const consentOrigins=new Set([new URL(publicUrl).origin,...redirectUris.map(uri=>new URL(uri).origin)]);
-  mkdirSync(dataDir,{recursive:true});
-  const db=new DatabaseSync(join(dataDir,'auth.sqlite'));
+  if(!database)mkdirSync(dataDir,{recursive:true});
+  const db=database||new DatabaseSync(join(dataDir,'auth.sqlite'));
   db.exec('PRAGMA journal_mode=WAL; PRAGMA busy_timeout=5000; CREATE TABLE IF NOT EXISTS auth_records(kind TEXT,key TEXT PRIMARY KEY,value TEXT,expires INTEGER);');
   const put=(kind,key,value,expires)=>db.prepare('INSERT OR REPLACE INTO auth_records VALUES(?,?,?,?)').run(kind,key,JSON.stringify(value),expires);
   const get=(kind,key)=>{const row=db.prepare('SELECT * FROM auth_records WHERE kind=? AND key=?').get(kind,key);return row&&row.expires>now()?JSON.parse(row.value):null;};

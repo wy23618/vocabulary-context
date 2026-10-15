@@ -1,78 +1,114 @@
 # Vocabulary Context
 
-首版面向 ChatGPT 电脑桌面应用和平板 App：暖绿色阅读界面、同一份词库、自然阅读与宿主英语交流。电脑运行 MCP 服务并保存数据；文章、释义、图片识别、句子分析与交流全部使用**当前宿主订阅模型**，服务器没有模型 API 客户端，没有模型密钥，不产生服务器模型调用费用。
+**把单词放回阅读与交流。** 支持 MCP Apps 的英语学习插件：用同一份个人词库准备阅读、获得逐处语境释义，并开展围绕目标词的英语交流。
 
-**核心闭环已在 ChatGPT Work 桌面宿主实测；独立 ChatGPT 桌面客户端和平板 App 尚未单独验收。** 请先看 [当前验收记录](docs/ACCEPTANCE.md)。本地浏览器只是 MCP Apps 协议测试环境，不是另一个产品网站。
+文章生成、图片识别和语言分析由当前兼容宿主的模型完成。服务端没有模型 API 客户端，不需要模型 API Key；宿主订阅与插件能力仍取决于使用者账号。
 
-日常使用：先启动 `scripts/Start-SecureConnection.ps1`，再在 ChatGPT 选择已连接的插件（当前显示名为 `Test`）。说“打开我的词库”，然后加入单词并在界面确认；说“用今天的词写一篇关于 AI 与大学学习的文章”，或点击生成。文章保存后点击词可立即查义；选同一组词即可独立开始英语交流。
+![语境阅读界面，合成测试数据](docs/images/reading.png)
 
-服务运行在这台电脑上，本机入口是 `http://127.0.0.1:8787`，ChatGPT 使用 `mcp.json` 中的 HTTPS `/mcp` 地址。学习数据库是项目 `data/vocabulary.sqlite`；登录配置在项目 `.env`，授权记录在 `data/auth.sqlite`。电脑、服务与隧道需要持续运行。
+## 核心功能
 
-2026-10-14 清理：两篇验收文章及关联生成缓存已从当前学习库删除；词库、熟练度和真实事件历史保留。清理前的完整学习数据备份在 `data/backups/before-cleanup-2026-10-14`。
+- 手动、批量或由宿主识别图片导入单词，逐项确认后保存。
+- 五档熟练度、今日词与旧词筛选、反复遗忘记录、目标词换批。
+- 按主题、篇幅与难度准备文章，校验词汇覆盖和位置标注后保存，支持历史重开。
+- 每个出现位置独立的中文释义、学习反馈、撤销与阅读位置恢复。
+- 独立英语交流流程；在已启用的交流中依据真实对话收录不理解的词。
+- 持久化、请求去重、版本冲突保护，以及 OAuth 2.1 / PKCE 认证。
 
-## 已实现
+## 演示与在线入口
 
-- 手动/批量导入、宿主图片识别后的逐项确认、重复词降级提示和恢复；真实保存、事件撤销、请求去重。
-- 五档熟练度、搜索、时区日期与等级组合筛选、反复遗忘、暂停自动旧词；今日/手动/自动来源及换批。
-- 独立阅读与交流：主题/篇幅/难度/句法、负载和分篇建议；宿主准备→生成→位置标注→校验修复→保存→阅读。
-- 具体出现位置的预存中文释义、轻微目标词提示、键盘与触控、明确反馈和撤销、阅读位置与历史恢复、按需句子结构。
-- SQLite WAL、版本冲突保护、OAuth 2.1/PKCE、电脑 HTTPS 安全转发脚本、一致性备份与完整恢复。
+[阅读截图](docs/images/reading.png) · [平板词库](docs/images/library.png) · [宿主验收记录](docs/ACCEPTANCE.md)
 
-词形覆盖使用保守的常见名词/动词变化规则。不做激进词形还原；未知不规则变化应让宿主改用目标原词。负载是程序估算，写作说明是宿主审阅，不是考研质量评分。主数据无自动后台云同步，两端打开/刷新/保存后读取同一服务。
+Cloudflare MCP 地址规划为 `https://vocabulary-context.hellovian.workers.dev/mcp`。首次发布及验证状态见 [Cloudflare 指南](docs/CLOUDFLARE.md)。根网页介绍连接方法，学习 UI 在兼容宿主中打开。
 
-## 启动与停止（本机 Windows）
+每个部署对应一份个人词库；公开代码不等于共享词库。请部署自己的实例并使用自己的登录密码。独立桌面、平板和 Voice 的支持以真实验收为准；浏览器协议测试不等于宿主安装验收。
 
-需要 Node.js 24+；依赖已经安装。首次在项目目录执行 `npm ci`、`npm run build`。日常使用以下脚本，不设置开机启动，不弹出额外服务窗口：
+## 快速开始
 
-```powershell
-./scripts/Start-SecureConnection.ps1
-./scripts/Status-VocabularyContext.ps1
+需要 Node.js 24 LTS、npm 和支持远程 MCP / MCP Apps 的宿主。
+
+```sh
+npm ci
+npm run build
 ```
 
-启动器先生成只保存在本机 `.env` 的词库登录密码，再启动 loopback 服务及已安装的 `cloudflared`。随后把实际 HTTPS origin 写入配置并重启服务。**数据库不随地址变化。** 已在当前网络实测 HTTPS、匿名 401、OAuth/PKCE、29 个 MCP 工具和界面资源读取。
+本地开发：复制 `.env.example` 为 `.env`，设置至少 20 字符的 `VOCAB_OWNER_PASSWORD`，运行 `npm start`。服务默认监听 `127.0.0.1:8787`。远程宿主需要稳定 HTTPS 入口，长期使用推荐 Cloudflare 部署。
 
-停止外网转发或整个服务：
+在宿主的自定义 MCP 设置中填写部署后的 `/mcp` URL，使用 OAuth 授权，并在授权页输入个人词库密码。安装边界见 [宿主支持记录](docs/HOST-SUPPORT.md)。
 
-```powershell
-./scripts/Stop-SecureConnection.ps1
-./scripts/Stop-VocabularyContext.ps1
+连接后尝试：
+
+> 打开我的词库，加入 retain、compelling 和 impose，先让我确认。
+>
+> 用今天的词写一篇关于 AI 与大学学习的文章。
+
+Skill 位于 `skills/vocabulary-context/`。远程 MCP 连接与宿主 Skill 安装是不同步骤，按宿主实际支持完成安装。
+
+## Cloudflare 部署
+
+```sh
+npm ci
+npm run build
+npx wrangler secret put VOCAB_OWNER_PASSWORD
+npm run deploy
 ```
 
-仅本机开发可运行 `./scripts/Start-VocabularyContext.ps1` 或 `npm start`。设置、运行 PID 和日志位于项目内 data 目录，密码不写日志。启动脚本保留已有 `.env`，不重置词库。若 PowerShell 被组织策略阻止，请在允许的终端运行 `npm start`，不要修改安全策略绕过。
+将 `wrangler.jsonc` 的 `VOCAB_PUBLIC_URL` 设置为实际 HTTPS origin，用 `VOCAB_REDIRECT_URIS` 精确配置回调。Workers 与 SQLite Durable Objects 保存词库和 OAuth 记录，不依赖本机持续开机、临时隧道或 VPS。
 
-电脑必须开机、联网并保持服务与连接运行；休眠、关机、断网或停止后，平板无法读写。页面保留当前未提交输入和配置，显示真实失败。临时 Quick Tunnel 不需账号或域名，但无 uptime 保证，停止失效、重建地址变化。[Cloudflare 官方限制](https://developers.cloudflare.com/tunnel/get-started/quick-tunnels/)。没有开通付费托管、域名或模型服务。
+GitHub Actions 在 `main` 推送后执行业务测试、构建和 Workers 运行时验收，再自动发布。仓库使用 secrets `CLOUDFLARE_API_TOKEN` 和 `CLOUDFLARE_ACCOUNT_ID`，词库密码只放在 Worker secrets 中。
 
-## 连接和安装到 ChatGPT
+本地 `data/` 不随 Git 或部署上传。迁移现有词库需先备份并验证新库，不能直接替换现有正式数据。见 [部署与迁移边界](docs/CLOUDFLARE.md)。
 
-1. 运行启动脚本，使用状态脚本或 `mcp.json` 中的**当前实际 HTTPS `/mcp` 地址**。需要时执行 `node --env-file-if-exists=.env scripts/check-connection.mjs` 做只读连接检验。
-2. 打开账号的 [ChatGPT Plugins](https://chatgpt.com/plugins)，选择 **+ → Add custom MCP server → URL**，输入地址，认证选 **OAuth / Dynamic Client Registration**。完成风险确认及 **Create as a plugin**。账号/workspace 的创建权限和 rollout 仍需实际确认。若桌面没有创建入口，可在账号网页注册，再回桌面 App 使用；网页注册不代替桌面使用验收。[官方步骤](https://developers.openai.com/plugins/deploy/connect-chatgpt)。
-3. 授权页输入本机 `.env` 中 `VOCAB_OWNER_PASSWORD` 的值。不要把密码发给模型或贴到聊天中；该密码只用于个人词库登录，不是 OpenAI 凭据。服务只接受配置的精确 ChatGPT callback。
-4. 安装插件，在新聊天中 `@Vocabulary Context`。服务器发布了 Skill 导入扩展与 Skill resource；需要把本包 Skill 一起安装/导入，不能仅凭工具连接声称 Skill 已激活。桌面可通过已注册的 `vocabulary-context-local` 本地来源安装 Skill 包；注册后可执行 `node scripts/bind-chatgpt.mjs <实际技术ID>` 关联，再重新打包。远程 MCP 的已注册技术 ID 绑定方式见 [连接说明](docs/LOCAL-CONNECTION.md)。**本地目录不能被平板读取。** 平板使用同一账号/workspace 的远程插件。
-5. 说“加入 compelling、retain、diminish、impose、conventional”，在导入界面核对并确认，再选词。说“用这组词写一篇 AI 与大学学习的短篇文章”或点击生成。按钮使用标准 `ui/message` 发到当前宿主；宿主生成并调用 `validate_article` / `save_article` 后才展示文章。没有自动调用宿主模型的普通 MCP 工具，没有复制提示词到另一个聊天的流程。
-6. 桌面 Work 宿主已验证连接、词库、文章生成/重开、逐处查词和反馈撤销。独立 ChatGPT 桌面客户端与平板 App 的真实安装验收仍未完成。Voice 中调用插件工具也未验证；文字交流上下文的宿主承接已验证，实际用户发言记录仍需真实交流后产生。
+## 开发与测试
 
-宿主若不支持消息触发、附件或 UI，界面会保留任务并明确提示；不会生成假文章。官方支持与实际验证的区分见 [宿主支持记录](docs/HOST-SUPPORT.md)。
-
-## 数据、备份与迁移
-
-当前数据目录：`D:\Projects\codex coding\About English\data`，默认使用项目目录下的 `data`，配置为 `VOCAB_DATA_DIR=./data`。相对路径以项目根目录为基准，不依赖从哪个文件夹启动。`vocabulary.sqlite` 保存词条、熟练度、事件、请求去重、目标组、文章、逐处释义、交流及界面偏好。`auth.sqlite` 保存 OAuth 连接记录。该目录已排除在版本控制和插件安装包之外。配置可以通过 `.env` 的 `VOCAB_DATA_DIR`、`VOCAB_PUBLIC_URL`、`VOCAB_OWNER_PASSWORD`、`VOCAB_REDIRECT_URIS` 隔离调整。
-
-```powershell
-node --env-file-if-exists=.env scripts/backup.mjs --out D:/VocabularyBackups/backup-2026-10-14
-# 恢复前停止服务；默认禁止覆盖现有词库。
-node --env-file-if-exists=.env scripts/restore.mjs --from D:/VocabularyBackups/backup-2026-10-14 --data-dir D:/VocabularyRestored
+```sh
+npm test                 # 业务、认证、协议与本地备份
+npm run build            # 构建自包含 MCP App HTML
+npm run test:cloudflare  # 打包并验收真实 Workers / Durable Object 运行时
+npm run test:ui          # 桌面、平板、窄屏交互，使用合成数据
+npm run package          # 生成供宿主安装的插件包
 ```
 
-备份可在线一致完成，带格式版本、数据版本和 SHA-256；包含所有学习 ID/事件/文章/释义，不导出密码或 OAuth 令牌。恢复检查完整性、拒绝较新 schema、要求服务停止。显式 `--replace` 会保留覆盖前的数据库文件，避免无保护替换。第二阶段只需在服务器部署同一服务、恢复备份、设置固定 HTTPS/数据目录/认证并重新授权，不重写业务与 UI。详见 [迁移说明](docs/MIGRATION.md)。
+打包前通过 `scripts/configure-endpoint.mjs` 配置实际 MCP HTTPS 地址。源码及安装包不应包含真实 `.env`、数据库、日志或私有连接记录。本地调试与备份操作见 [本地开发说明](docs/LOCAL-DEVELOPMENT.md)。
 
-## 开发验收与打包
+## 技术栈与结构
+
+React · MCP SDK / MCP Apps · Zod · Express · SQLite · esbuild · Playwright · Cloudflare Workers / Durable Objects
 
 ```text
-npm test
-npm run test:ui
-npm run package
+web/                  阅读、词库与交流界面
+server/service.mjs    学习业务、幂等与冲突控制
+server/repository.mjs 本地 SQLite 存储
+server/auth.mjs       OAuth 2.1 / PKCE
+server/index.mjs      MCP 工具、资源与 HTTP 服务
+cloudflare/           Durable SQL、云端入口、schema 与运行时验收
+shared/               交流指令与共享逻辑
+skills/               宿主学习工作流 Skill
+scripts/              构建、打包、本地启动与备份
+tests/               业务、认证、协议与 UI 验收
+docs/                截图、连接说明与验收边界
+plugin.json mcp.json   插件清单与连接描述
 ```
 
-`dist/vocabulary-context-0.1.2.zip` 包含根 `plugin.json`、`mcp.json`、Skill、服务和自包含 MCP App UI；不含 `.env`、数据库、令牌、日志、node_modules 或测试文章。连接地址重建后重新打包；安装包不是持续在线服务。官方 Plugin/MCP canonical schema 已实际检查。
+## 日常更新
 
-开发截图和测试输出已清理，不进入安装包。运行 `npm run test:ui` 可重新生成 `docs/previews` 和 `test-results`；这些输出不属于学习数据。
+```sh
+git add .
+git commit -m "Describe the change"
+git push
+```
+
+`main` 检查通过后更新 Cloudflare，代码更新不重置词库。改变正式 origin 或 OAuth 回调时，宿主可能需要重新授权。
+
+## Roadmap
+
+- [x] 个人词库、熟练度、语境阅读与交流
+- [x] OAuth、幂等、版本保护及本地备份
+- [x] Cloudflare 持久化适配与运行时协议验收
+- [ ] 完成首次公开服务发布与现有词库迁移验证
+- [ ] 完成独立桌面、平板宿主的完整安装验收
+- [x] 一致性备份、空库迁移与导入回执
+- [ ] 云端定期备份及运维记录
+- [ ] 更多阅读主题与学习统计
+
+欢迎以合成词条和复现步骤反馈问题。勿附带真实数据库、OAuth 令牌或密码，安全问题见 [SECURITY.md](SECURITY.md)。

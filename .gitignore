@@ -20,3 +20,26 @@ playwright-report/
 *.tmp
 Thumbs.db
 .DS_Store
+
+# Dependencies, build output, local runtime and test artifacts
+.wrangler/
+.dev.vars
+.dev.vars.*
+!.dev.vars.example
+!.env.*.example
+.runtime/
+*.tsbuildinfo
+*.bak
+*.pem
+*.key
+*.p12
+*.pfx
+*.db
+*.dump
+*.sql.gz
+.idea/
+
+# Per-user connector binding; rebind with scripts/bind-chatgpt.mjs
+.app.json
+
+*.cloudflare-backup.json
