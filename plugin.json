@@ -1,0 +1,27 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+  "name": "vocabulary-context",
+  "version": "0.1.2",
+  "description": "Contextual English reading and conversation with a shared personal vocabulary library.",
+  "extensions": {
+    "com.openai": {
+      "interface": {
+        "displayName": "Vocabulary Context",
+        "shortDescription": "把考研词汇放回阅读与交流",
+        "longDescription": "在自然阅读和交流中复习今天的词与反复遗忘的旧词。共享词库、语境释义和明确熟练度反馈，使用当前宿主订阅模型。",
+        "category": "Education & Research",
+        "capabilities": [
+          "Interactive",
+          "Read",
+          "Write"
+        ],
+        "brandColor": "#617A63",
+        "defaultPrompt": [
+          "用今天的词和几个不熟的旧词，写一篇关于 AI 与大学学习的考研文章。",
+          "用同一组词，聊聊实习与独立思考。"
+        ]
+      },
+      "apps": "./.app.json"
+    }
+  }
+}

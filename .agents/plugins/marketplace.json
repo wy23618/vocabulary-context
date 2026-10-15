@@ -1,0 +1,10 @@
+{
+  "name": "vocabulary-context-local",
+  "plugins": [{
+    "name": "vocabulary-context",
+    "source": { "source": "local", "path": "./" },
+    "policy": { "installation": "AVAILABLE", "authentication": "ON_INSTALL" },
+    "category": "Education & Research",
+    "interface": { "displayName": "Vocabulary Context" }
+  }]
+}

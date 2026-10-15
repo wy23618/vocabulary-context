@@ -1,0 +1,16 @@
+services:
+  vocabulary-context:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+    restart: unless-stopped
+    environment:
+      VOCAB_PUBLIC_URL: ${VOCAB_PUBLIC_URL:?Set the stable HTTPS service origin}
+      VOCAB_OWNER_PASSWORD: ${VOCAB_OWNER_PASSWORD:?Set the personal-library password}
+      VOCAB_REDIRECT_URIS: ${VOCAB_REDIRECT_URIS:-https://chatgpt.com/connector_platform_oauth_redirect}
+    ports:
+      - "127.0.0.1:8787:8787"
+    volumes:
+      - vocabulary-data:/data
+volumes:
+  vocabulary-data:
