@@ -7,6 +7,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { createService } from '../server/service.mjs';
+import { UI_VERSION } from '../shared/ui-version.mjs';
 import { startHarness } from './harness.mjs';
 
 const output = path.resolve('docs/previews');
@@ -27,7 +28,7 @@ try {
   const context = await browser.newContext({ viewport: { width: 1180, height: 820 } });
   page = await context.newPage(); page.on('pageerror', e => errors.push(e.message));
   let ui = await connected(page);
-  await check('empty library renders through actual MCP App initialize/tools bridge', async () => { await ui.getByText('从今天的几个词开始').waitFor(); await noOverflow(ui); await page.screenshot({ path: path.join(output, 'empty-tablet.png') }); });
+  await check('empty library renders through actual MCP App initialize/tools bridge', async () => { await ui.getByText('从今天的几个词开始').waitFor(); await expect(ui.locator('[data-ui-version]')).toHaveText(`界面 v${UI_VERSION}`); await noOverflow(ui); await page.screenshot({ path: path.join(output, 'empty-tablet.png') }); });
   await check('text import, duplicate preview, editable confirmation, true persistence', async () => {
     await ui.getByRole('button', { name: '＋ 加入单词' }).click();
     await ui.getByRole('textbox', { name: '输入或粘贴单词' }).fill('compelling\nretain\ndiminish\nimpose\nconventional\nretain');
@@ -70,11 +71,17 @@ try {
     await ui.getByRole('button', { name: '换一批旧词' }).click(); await ui.getByText('已更换可替换的旧词；今日词和手动必选词保留。').waitFor(); const after = (await service.execute('get_selection')).selection; assert.deepEqual(after.words.filter(w => w.sources.includes('today')).map(w => w.id), before.words.filter(w => w.sources.includes('today')).map(w => w.id));
     await page.screenshot({ path: path.join(output, 'selection-tablet.png') });
   });
-  await check('conversation preparation independent of reading; context handoff, no fake usage', async () => {
-    const messagesBefore=harness.messages.length;
-    await ui.getByRole('button', { name: '英语交流', exact: true }).click(); await ui.getByRole('button', { name: '开始交流', exact: true }).click(); await ui.getByText('准备好了，可以开始交流', { exact: true }).waitFor();
+  await check('conversation start sends setup into chat and does not count fake usage', async () => {
+      const followUpsBefore=await page.evaluate(()=>window.sentFollowUps.length);
+    const contextsBefore=await page.evaluate(()=>window.modelContexts.length),messagesBefore=harness.messages.length;
+    await ui.getByRole('button', { name: '英语交流', exact: true }).click(); await ui.getByLabel('话题', { exact: true }).fill('爱情'); await ui.getByRole('button', { name: '开始交流', exact: true }).click(); await ui.getByText('练习主题已发送到聊天', { exact: true }).waitFor();
     assert.ok((await service.execute('list_words')).words.every(w => w.conversation_count === 0));
-    assert.equal(harness.messages.length,messagesBefore);const prepared=await page.evaluate(()=>window.modelContexts.at(-1).structuredContent.vocabulary_conversation);assert.ok(prepared.conversation_id&&prepared.words.length);assert.match(prepared.instructions,/preparation only/);
+    assert.equal(await page.evaluate(()=>window.modelContexts.length),contextsBefore);
+    assert.equal(harness.messages.length,messagesBefore+1,'Starting a conversation must send setup into the current chat');
+    assert.equal(await page.evaluate(()=>window.sentFollowUps.length),followUpsBefore,'Preparing a conversation must not trigger a follow-up reply');
+    assert.match(harness.messages.at(-1).content[0].text,/FIRST spoken response/);
+    assert.match(harness.messages.at(-1).content[0].text,/主题：爱情/);
+    assert.match(harness.messages.at(-1).content[0].text,/现在请只回复“好，我们开始吧。”/);
     await page.screenshot({ path: path.join(output, 'conversation-desktop.png') });
   });
   await check('real generation handoff preserves pending state until actual saved article', async () => {

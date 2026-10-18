@@ -1,7 +1,7 @@
 import { randomUUID, createHash } from 'node:crypto';
 import { Repository } from './repository.mjs';
 import { loadConfig } from './config.mjs';
-import { conversationOpening, conversationLearningInstruction } from '../shared/conversation.mjs';
+import { conversationOpening, conversationInstructions } from '../shared/conversation.mjs';
 import { tools as toolDefinitions } from './schemas.mjs';
 
 export class DomainError extends Error {
@@ -15,7 +15,7 @@ const normalize=x=>String(x??'').normalize('NFKC').trim().toLowerCase().replace(
 const levels=['Lv.1','Lv.2','Lv.3','Lv.4','Lv.5'];
 const validLevel=n=>Number.isInteger(n)&&n>=0&&n<=4;
 const sources=new Set(['MANUAL','PASTE','IMAGE','SYSTEM']);
-const WRITE=new Set(['add_words','import_words_from_image','confirm_import','update_familiarity','remove_word','undo_event','select_target_words','reroll_auto_words','save_selection','prepare_article','prepare_split_articles','save_article','record_word_feedback','prepare_conversation','record_conversation_usage','save_sentence_analysis','save_preferences','save_word_details','capture_conversation_word']);
+const WRITE=new Set(['add_words','import_words_from_image','confirm_import','update_familiarity','remove_word','undo_event','select_target_words','reroll_auto_words','save_selection','prepare_article','prepare_split_articles','save_article','record_word_feedback','prepare_conversation','record_conversation_usage','save_conversation_review','save_sentence_analysis','save_preferences','save_word_details','capture_conversation_word']);
 export const SELECTION_WEIGHTS={familiarity:[10,8,5,2,.5],load:[2,2,1.5,1,.5],strata:[.5,.3,.2]};
 const lengthRanges={short:[200,300],standard:[350,500],long:[550,750]};
 const dateKey=(value,zone)=>new Intl.DateTimeFormat('en-CA',{timeZone:zone,year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date(value));
@@ -266,12 +266,14 @@ export function createService({dataDir=loadConfig().dataDir,now=()=>new Date(),r
         const level=args.feedback==='unknown'?0:args.feedback==='vague'?2:Math.max(3,before.familiarity_level);const after={...before,familiarity_level:level,version:before.version+1};if(after.familiarity_level>=2)after.learning_status=null;const e=event('LEVEL_CHANGE','MANUAL',before,after,{lesson_id:args.lesson_id,occurrence_id:args.occurrence_id,feedback:args.feedback});return {word:after,event_id:e.id,level};
       }
       case 'prepare_conversation': {
-        const selection=selectionFor(args.selection_id);check(selection.words.length>0,'请先选择目标词。');const mode=args.mode??'balanced';check(['relaxed','balanced','intensive'].includes(mode),'交流模式无效。');const topic=String(args.topic??'学习、生活与未来').trim();
+        const selection=args.selection_id?selectionFor(args.selection_id):{id:null,words:[]};const mode=args.mode??'balanced';check(['relaxed','balanced','intensive'].includes(mode),'交流模式无效。');const topic=String(args.topic??'学习、生活与未来').trim();
         const words=selection.words.map(w=>({...wordFor(w.id),sources:w.sources,reason:w.reason}));const variant=args.opening_variant??repository.objects('conversation').length;const customOpening=String(args.custom_opening??'').trim();check(customOpening.length<=2000,'开场白最多 2000 字符。');const opening=customOpening||conversationOpening(topic,variant);
-        const context=`Have a natural English conversation about ${topic}. Mode: ${mode}. Vocabulary anchors: ${words.map(w=>w.word).join(', ')}. Follow the user's changing interests. Create occasional natural opportunities to hear and use these words; never drill one word at a time or force coverage. In balanced mode, roughly 70% normal conversation and 30% deliberate vocabulary opportunities, without counting turns. Explain or correct gently when requested. Voice, when available: slightly slow, clear, natural. Only record words actually present in a completed assistant or user transcript using record_conversation_usage, with the correct actor and a unique request_id; preparation is not usage. This text does not establish voice capability.`;
-        const conversation={id:id(),selection_id:selection.id,topic,mode,words,opening,custom_opening:customOpening,opening_variant:variant,auto_capture_new_words:true,context:context+' '+conversationLearningInstruction,created_at:stamp()};repository.put('conversation',conversation.id,conversation);return {conversation};
+        const conversation={id:id(),selection_id:selection.id,topic,mode,words,opening,custom_opening:customOpening,opening_variant:variant,auto_capture_new_words:true,turns:[],review:null,created_at:stamp()};conversation.context=conversationInstructions(conversation);repository.put('conversation',conversation.id,conversation);return {conversation};
       }
-      case 'get_conversation_context': return {conversation:repository.get('conversation',args.conversation_id)??fail('CONVERSATION_NOT_FOUND','交流上下文不存在。')};
+      case 'get_conversation_context': {
+        const saved=repository.get('conversation',args.conversation_id)??fail('CONVERSATION_NOT_FOUND','交流上下文不存在。');
+        return {conversation:{...saved,context:conversationInstructions(saved)}};
+      }
       case 'capture_conversation_word': {
         const parsed=toolDefinitions.find(t=>t.name==='capture_conversation_word').inputSchema.safeParse(args);check(parsed.success,'请提供实际用户发言、解释和本轮标识。');
         const conversation=repository.get('conversation',args.conversation_id)??fail('CONVERSATION_NOT_FOUND','交流上下文不存在。');check(conversation.auto_capture_new_words===true,'这份交流上下文尚未启用生词收录，请重新开始交流。');
@@ -291,10 +293,22 @@ export function createService({dataDir=loadConfig().dataDir,now=()=>new Date(),r
       }
       case 'record_conversation_usage': {
         const conversation=repository.get('conversation',args.conversation_id)??fail('CONVERSATION_NOT_FOUND','请先准备交流上下文。');check(['ai','user'].includes(args.actor),'请标注AI或用户实际使用。');check(typeof args.text==='string'&&args.text.length>0&&args.text.length<=50000,'请提供实际交流文字。');
+        const turn_id=args.turn_id??args.request_id,turns=conversation.turns??[];
+        const prior=turns.find(turn=>turn.turn_id===turn_id);
+        if(prior){check(prior.actor===args.actor&&prior.text===args.text,'同一轮标识不能用于不同发言。');return {turn_id,matched_words:prior.matched_words,events:[]};}
         const text=normalize(args.text),tokens=tokenize(text).map(t=>normalize(t.text));const matched_words=[],events=[];
         for(const w of conversation.words){const variants=forms(w.word);const used=w.word.includes(' ')?new RegExp(`(?<![\\p{L}])${w.word.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')}(?![\\p{L}])`,'u').test(text):tokens.some(t=>variants.has(t));if(!used)continue;const before=repository.word(w.id);if(!before)continue;
           const after={...before,last_conversation_at:stamp(),conversation_count:before.conversation_count+1,version:before.version+1};events.push(event('CONVERSATION','SYSTEM',before,after,{conversation_id:conversation.id,actor:args.actor,text:args.text}));matched_words.push({word_id:w.id,word:w.word,actor:args.actor});}
-        return {matched_words,events};
+        repository.put('conversation',conversation.id,{...conversation,turns:[...turns,{turn_id,actor:args.actor,text:args.text,matched_words,recorded_at:stamp()}]});
+        return {turn_id,matched_words,events};
+      }
+      case 'save_conversation_review': {
+        const parsed=toolDefinitions.find(t=>t.name==='save_conversation_review').inputSchema.safeParse(args);check(parsed.success,'请提供完整复盘、真实原句与改进建议。');
+        const conversation=repository.get('conversation',args.conversation_id)??fail('CONVERSATION_NOT_FOUND','交流上下文不存在。');
+        const turns=conversation.turns??[];check(turns.some(turn=>turn.actor==='user'),'尚未记录真实用户发言，无法复盘。');
+        for(const gap of args.gaps){const turn=turns.find(turn=>turn.turn_id===gap.turn_id&&turn.actor==='user');check(turn&&turn.text.includes(gap.quote),'复盘原句必须来自对应的真实用户发言。');}
+        const review={summary:args.summary,strengths:args.strengths,gaps:args.gaps,next_steps:args.next_steps,turn_count:turns.length,created_at:stamp()};
+        repository.put('conversation',conversation.id,{...conversation,review});return {conversation_id:conversation.id,review};
       }
       case 'save_word_details': {
         const parsed=toolDefinitions.find(t=>t.name==='save_word_details').inputSchema.safeParse(args);check(parsed.success,'词典资料格式不完整，请提供音标、释义、同根词、近义词及双语例句。');

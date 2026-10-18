@@ -22,7 +22,7 @@
 | UI 调工具 | `tools/call`，工具 `ui.visibility` 含 `app` | 通过同一能力协议；不能仅凭屏幕尺寸推断可用 | 运行时检查 bridge / capabilities，失败明确提示 |
 | 图片识别与确认 | file params 与可选上传扩展有官方接口 | 具体移动文件选择器、扩展可用性未实测 | 接收真实文件，再识别，再确认；不直接保存 |
 | 文章重新打开/恢复 | 服务端保存业务数据，UI 恢复展示状态 | 同一账户映射至同一服务端数据 | 必须验证两端读写同一词库；widgetState 不是数据库 |
-| 文字交流带入目标词 | `ui/update-model-context` / `ui/message` | 真实 Work 对话已收到与按钮等价的开场请求，并自然提出英语问题；没有用户答复，故未记实际使用 | 准备阶段不计交流次数；仅真实话语命中才记录 |
+| 文字交流带入目标词 | `ui/message` | 真实 Work 对话已收到与按钮等价的准备消息；没有用户答复，故未记实际使用 | 准备阶段不计交流次数；仅真实话语命中才记录 |
 | Voice 承接与使用记录 | 当前 Voice 文档说明桌面 Chat / Work / Codex 和账号限制 | 文档提到 iOS 配对桌面访问，未建立独立平板 Voice + 本插件工具的完整保证 | **未接通、未验证；不能宣称支持 Voice 工具调用与自动记录** |
 
 矩阵依据：[ChatGPT Plugins](https://learn.chatgpt.com/docs/plugins)、[UI 指南](https://developers.openai.com/plugins/build/chatgpt-ui)、[插件质量要求](https://developers.openai.com/plugins/plugin-guidelines)、[Voice](https://learn.chatgpt.com/docs/features/voice)。
@@ -33,7 +33,7 @@
 
 **规范差异（2026-10-14 核对）：** OpenAI 包装文档在 `mcp.json` 的 server 下展示 `extensions.com.openai.auth`；但实际读取的 [Agent Plugins MCP 1.0.0 canonical schema](https://agent-plugins.org/schemas/1.0.0/mcp.schema.json) 对 `streamableHttpServer` 仅允许 `type`、`url`、`headers`，且 `additionalProperties: false`。这两处当前不一致。本项目 portable `mcp.json` 因而保留通用规范允许的 transport/URL，不放 server extensions；**这不是关闭 OAuth**。服务仍返回 401 Bearer challenge、protected-resource/authorization metadata，支持 DCR + PKCE，并在 ChatGPT 创建连接时选择 OAuth。schema 合格、认证服务可用与宿主真实安装分别验收，不能相互替代。根 `plugin.json` 的 OpenAI 展示 extensions 与此 server schema 差异是不同层级。
 
-新 UI 使用 `_meta.ui.resourceUri`，资源 MIME 为 `text/html;profile=mcp-app`。iframe 通过 MCP Apps JSON-RPC `postMessage` 完成 `ui/initialize`、工具结果通知、`tools/call`、`ui/message`、`ui/update-model-context`；优先使用标准接口，ChatGPT 特有能力才使用 `window.openai`。所有扩展都检查存在性。插件 UI 是宿主内局部工具界面，不是另外部署一个聊天网站。[MCP UI quickstart](https://developers.openai.com/plugins/build/app-quickstart)、[UI 接入说明](https://developers.openai.com/plugins/build/chatgpt-ui)。
+新 UI 使用 `_meta.ui.resourceUri`，资源 MIME 为 `text/html;profile=mcp-app`。iframe 通过 MCP Apps JSON-RPC `postMessage` 完成 `ui/initialize`、工具结果通知和 `tools/call`。开始交流通过 `ui/message` 自动发送完整准备消息，要求文字只回复“好，我们开始吧。”，指定开场白留到手动启动语音后的第一次回应。插件 UI 是宿主内局部工具界面，不是另外部署一个聊天网站。[MCP UI quickstart](https://developers.openai.com/plugins/build/app-quickstart)、[UI 接入说明](https://developers.openai.com/plugins/build/chatgpt-ui)。
 
 `window.openai.requestDisplayMode` 可请求 fullscreen；不能假定任意容器/设备一定授予某模式。布局按实际容器宽度响应。Composer mentions 属于桌面扩展，不能作为平板核心流程的必要条件。[UI reference](https://developers.openai.com/plugins/reference)、[Plugin Extensions](https://developers.openai.com/plugins/build/extensions)。
 
@@ -50,7 +50,7 @@ UI 用户选择文件时，可检查 `window.openai.uploadFile` / `getFileDownlo
 文章按钮的闭环为：
 
 1. UI 调用 `prepare_article`，保存目标词、配置与唯一请求 ID，取得完整生成要求和严格 schema。
-2. UI 使用 `ui/update-model-context` 传入请求 ID 与必要配置，再通过 `ui/message` 发送 `role: "user"` 的真实生成指令，请当前宿主模型按已安装 Skill 完成后续工具链。OpenAI 官方将该接口对应到 `window.openai.sendFollowUpMessage`。[UI 标准与兼容接口](https://developers.openai.com/plugins/build/chatgpt-ui)、[ChatGPT 扩展 reference](https://developers.openai.com/plugins/reference)。
+2. UI 使用 `ui/message` 发送完整准备消息并触发文字确认；原生语音是否承接该消息中的主题与开场白，仍需在真实宿主实测。[UI 标准与兼容接口](https://developers.openai.com/plugins/build/chatgpt-ui)、[ChatGPT 扩展 reference](https://developers.openai.com/plugins/reference)。
 3. 模型读取 Skill / 生成要求，生成真实文章和每个出现位置的释义，调用 `validate_article`。校验失败应根据真实错误修复，然后重验；不得以示例文章或提示词代替结果。
 4. 模型调用 `save_article`，服务重新校验并以同一请求 ID 幂等保存。UI 查询该请求的实际状态，只有读到已保存文章才显示完成并进入阅读。
 
@@ -108,8 +108,24 @@ UI 用户选择文件时，可检查 `window.openai.uploadFile` / `getFileDownlo
 - **代表性尺寸测试：由 UI 测试报告据实记录**；本文件不提前给出合格结论。
 - **Windows 桌面 ChatGPT Work 宿主：已验证文章生成/保存/重开、即时查词与反馈；独立 ChatGPT 桌面客户端未单独验证。**
 - **真实 ChatGPT 平板 App：尚未验证。**
-- **桌面 Work 文字交流上下文：已验证；用户实际使用记录：尚未产生。桌面/平板跨端真机同步与 Voice 工具调用：尚未验证。**
+- **桌面 Work 文字准备消息：已验证；用户实际使用记录：尚未产生。桌面/平板跨端真机同步与 Voice 工具调用：尚未验证。**
 
 连接进展更新（2026-10-14）：早期临时入口的 530 / 1033 已修复。当前 0.1.1 HTTPS `/mcp` 的匿名 401、OAuth/DCR/PKCE 与 issuer、29 个 MCP tools、`open_workspace`、v2 阅读 UI resource 已通过只读连接检查；Windows ChatGPT Work 宿主在服务停止时调用失败，重启后恢复。目标词、文章重开、即时释义、明确反馈/撤销和自然文字交流开场在该 Work 宿主环境有实际结果，见 [桌面验收](DESKTOP-ACCEPTANCE.md)。**没有独立 ChatGPT 桌面客户端的单独实测；真实图片附件上传和 Voice 工具调用仍未验证。** 临时地址随隧道重建改变，当前真实地址见配置及运行报告。
 
 后续若完成真机测试，应新增带证据的日期记录，保留本次审计的边界。
+
+
+## 2026-10-18：真实宿主的旧组件复现
+
+在当前聊天的 MCP Apps 面板中直接检查并点击了交流按钮：已打开的旧组件没有同页选词，仍显示通用开场，点击后只显示“准备好了”，没有调用新版的显式开始流程。服务器代码更新和新资源读取，不能使已经挂载的旧 iframe 自动升级。新打开的组件已确认显示同页选词和“爱情”的英语开场；首次开始只把内容放入输入框，用户明确确认仍须手动发送。因此那次验证不算自动开始成功。
+
+此前 v12 的被动上下文方案已被后续实现替代。每次服务或 UI 元数据修改后，需刷新插件连接并新开聊天以加载新资源。模拟宿主只能验证组件发出了协议请求，不能代替真实语音端到端验证。
+
+2026-10-18 真实面板复核：用户确认重新打开后仍见旧文案。通过 MCP Apps UI 自动化直接读取，面板 12 为 v11，面板 13 为 v12；不能再将重新打开旧界面归因于用户未关闭原面板。在真实 v12 面板点击“重新准备本次话题”后，本聊天实际收到 `kind=model_context` 的 MCP App 上下文，包含已保存的爱情主题、指定开场、9 个目标词及交流规则。证明上下文交接已到达当前文本模型，不证明原生 Voice 已接续或已完成实际发言/复盘。截图：`previews/local-v12-context-confirmed.png`。再次调用本地测试 open_workspace 后，面板 14 实际显示 v12。
+
+同时修复旧资源兼容表遗漏 v10、v11 的问题：现在保留从 v1 至当前版本前一版的全部 URI；协议测试独立遍历每个历史版本并确认都返回当前 HTML，避免测试只检查服务自己导出的不完整列表。宿主仍可能缓存旧 HTML；[官方连接测试流程](https://developers.openai.com/plugins/deploy/connect-chatgpt)要求在 UI 元数据变化后刷新连接并新开聊天。[UI 文档](https://developers.openai.com/plugins/build/chatgpt-ui)要求把 URI 作为缓存键。浏览器设置页自动操作连续超时，本次没有完成或声称已完成连接 Refresh。已有缓存界面不能由修复资源读取替代主动刷新。
+
+
+### 2026-10-18：最终交流启动流程
+
+点击“开始交流”后保存主题、开场白、模式与目标词，并通过 `ui/message` 自动发送一条完整准备消息。ChatGPT 在文字中只确认“好，我们开始吧。”；用户手动打开同一聊天的语音，第一次语音回应使用指定英文开场白。准备消息和确认回复不计入练习记录。流程不调用 `ui/update-model-context`，避免输入框出现重复的待提交上下文卡片。界面只能确认消息请求被宿主接受，不能据此证明模型已回复或 Voice 已连接；原生 Voice 的主题承接仍需端到端验收。

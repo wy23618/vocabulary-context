@@ -6,6 +6,7 @@ import {join} from 'node:path';
 import {randomUUID} from 'node:crypto';
 import {createService} from '../server/service.mjs';
 import {tools} from '../server/schemas.mjs';
+import {conversationLaunchMessage,conversationOpening} from '../shared/conversation.mjs';
 
 async function setup(t){
   const dataDir=mkdtempSync(join(tmpdir(),'conversation-learning-')),service=createService({dataDir});
@@ -52,4 +53,45 @@ test('no automatic capture from ordinary word occurrence, unrelated evidence, in
 });
 test('a reversed capture cannot resurrect a word on retry with a new request',async t=>{
   const {call,capture}=await setup(t);const result=await capture({});await call('undo_event',{event_id:result.event_id});await assert.rejects(capture({}),{code:'INVALID_INPUT'});
+});
+
+test('review retains non-target speech, validates user evidence and survives retries and reopening',async t=>{
+  const {call,conversation,service}=await setup(t);
+  assert.match(conversation.context,/FIRST spoken response must be in English/);
+  assert.ok(conversation.context.includes(conversation.opening));
+  const review={conversation_id:conversation.id,summary:'过去时需要练习。',strengths:['能够表达旅行经历。'],gaps:[{kind:'grammar',turn_id:'user-1',quote:'I go there yesterday.',correction:'I went there yesterday.',explanation:'yesterday 表示过去，应使用 went。'}],next_steps:['用过去时描述一次旅行。']};
+  await assert.rejects(call('save_conversation_review',review),{code:'INVALID_INPUT'});
+  const args={conversation_id:conversation.id,actor:'user',turn_id:'user-1',text:'I go there yesterday.'};
+  const turn=await call('record_conversation_usage',args);assert.equal(turn.matched_words.length,0);
+  tools.find(t=>t.name==='record_conversation_usage').outputSchema.parse(turn);
+  await call('record_conversation_usage',args);
+  await assert.rejects(call('record_conversation_usage',{...args,text:'A different turn.'}),{code:'INVALID_INPUT'});
+  await call('record_conversation_usage',{conversation_id:conversation.id,actor:'ai',turn_id:'ai-1',text:'Where did you go?'});
+  await assert.rejects(call('save_conversation_review',{...review,gaps:[{...review.gaps[0],turn_id:'ai-1',quote:'Where did you go?'}]}),{code:'INVALID_INPUT'});
+  await assert.rejects(call('save_conversation_review',{...review,gaps:[{...review.gaps[0],quote:'Invented speech.'}]}),{code:'INVALID_INPUT'});
+  const request_id=randomUUID();const saved=await call('save_conversation_review',{...review,request_id});
+  assert.deepEqual(await call('save_conversation_review',{...review,request_id}),saved);
+  tools.find(t=>t.name==='save_conversation_review').outputSchema.parse(saved);
+  const reopened=(await call('get_conversation_context',{conversation_id:conversation.id})).conversation;
+  assert.equal(reopened.turns.length,2);assert.deepEqual(reopened.review,saved.review);
+  assert.ok((await service.execute('list_words')).words.every(word=>word.familiarity_level===4));
+});
+
+test('a new request id for the same stable turn cannot count usage twice',async t=>{
+  const {call,conversation,service}=await setup(t);
+  const args={conversation_id:conversation.id,actor:'user',turn_id:'stable-user-turn',text:'This is compelling.'};
+  await call('record_conversation_usage',args);await call('record_conversation_usage',args);
+  assert.equal((await service.execute('search_words',{query:'compelling'})).words[0].conversation_count,1);
+});
+
+test('free practice needs no selection and launch message carries exact practice data and voice instructions',async t=>{
+  const {call}=await setup(t);
+  const input=tools.find(tool=>tool.name==='prepare_conversation').inputSchema.parse({topic:'关于爱',custom_opening:'How do you show love?',request_id:randomUUID()});
+  const {conversation}=await call('prepare_conversation',input);
+  assert.equal(conversation.selection_id,null);assert.deepEqual(conversation.words,[]);
+  const context=conversationLaunchMessage(conversation);
+  assert.ok(context.includes(conversation.id));assert.ok(context.includes('关于爱'));assert.ok(context.includes('How do you show love?'));
+  assert.match(context,/不要在文字里说出开场白/);assert.match(context,/FIRST spoken response must be in English/);
+  assert.match(context,/greeting or short Chinese reply is not a topic or language change/);
+  assert.match(conversationOpening('关于爱'),/love/);
 });

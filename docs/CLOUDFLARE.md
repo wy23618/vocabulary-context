@@ -2,7 +2,7 @@
 
 ## 当前状态（2026-10-15）
 
-本地 41 项业务/认证/协议测试、19 项 UI 验收通过。Workers 打包通过；真实 Workers 运行时已验收 OAuth / PKCE、MCP 工具、词库写入、版本冲突回滚与 UI/Skill 资源读取。2026-10-15 已部署至 Cloudflare Workers，并完成 HTTPS、健康检查、匿名保护和词库备份导入验证。
+本地 44 项业务/认证/协议测试、19 项 UI 验收通过。Workers 打包通过；真实 Workers 运行时已验收 OAuth / PKCE、MCP 工具、词库写入、版本冲突回滚与 UI/Skill 资源读取。2026-10-18 已部署 0.1.3（界面 v14）至 Cloudflare Workers，并完成 HTTPS、健康检查和匿名保护验证；既有 Durable Object 词库保持不变。
 
 正式 MCP 地址：[`https://vocab.hellovian.com/mcp`](https://vocab.hellovian.com/mcp)。备用入口：`https://vocabulary-context.hellovian.workers.dev/mcp`。`/health` 返回 200 且账号登录已配置，匿名 MCP 请求返回 401。
 

@@ -10,15 +10,16 @@ import { createService } from './service.mjs';
 import { tools } from './schemas.mjs';
 import { createAuth } from './auth.mjs';
 import { loadConfig } from './config.mjs';
+import { UI_VERSION } from '../shared/ui-version.mjs';
 
-export const UI_URI='ui://vocabulary-context/v6/reader.html';
-export const UI_COMPAT_URIS=['ui://vocabulary-context/v1/reader.html','ui://vocabulary-context/v2/reader.html','ui://vocabulary-context/v3/reader.html','ui://vocabulary-context/v4/reader.html','ui://vocabulary-context/v5/reader.html'];
-const workflow='All model work uses this host subscription. Stage manual/image word imports for reviewed confirmation. In enabled conversation practice, capture_conversation_word implements standing user authorization to collect words explicitly asked about or not understood: explain, capture with actual user evidence, and do not demand another import confirmation. For articles: first inspect open_workspace.active_generation or a supplied generation_id. Resume prepared tasks with get_generation and the SAME generation ID, including after a user authorizes a previously blocked UI request; reopen saved tasks without generating again. Only call prepare_article for a genuinely new article request; it freezes targets/config; write real prose; tokenize_article returns tokens[].index: send as word_map[].token_index; annotate content words with Chinese contextual definitions; validate_article, fix errors, save_article. Only saved article is success. Clicking definitions never changes levels. prepare_conversation is independent of reading; record only actual transcript. No API model calls. Image vision is done by host, then import_words_from_image stages real recognized items.';
+export const UI_URI=`ui://vocabulary-context/v${UI_VERSION}/reader.html`;
+export const UI_COMPAT_URIS=Array.from({length:UI_VERSION-1},(_,index)=>`ui://vocabulary-context/v${index+1}/reader.html`);
+const workflow='All model work uses this host subscription. Stage manual/image word imports for reviewed confirmation. In enabled conversation practice, capture_conversation_word implements standing user authorization to collect words explicitly asked about or not understood: explain, capture with actual user evidence, and do not demand another import confirmation. For articles: first inspect open_workspace.active_generation or a supplied generation_id. Resume prepared tasks with get_generation and the SAME generation ID, including after a user authorizes a previously blocked UI request; reopen saved tasks without generating again. Only call prepare_article for a genuinely new article request; it freezes targets/config; write real prose; tokenize_article returns tokens[].index: send as word_map[].token_index; annotate content words with Chinese contextual definitions; validate_article, fix errors, save_article. Only saved article is success. Clicking definitions never changes levels. prepare_conversation is independent of reading. On the practice launch message reply only “好，我们开始吧。” in text and wait for manual voice start; do not deliver the opening in text or record setup/acknowledgement as practice. Begin actual voice practice with the prepared English opening, no Chinese greeting; lead the selected topic with concrete follow-ups. Automatically record real completed user/AI turns with stable turn_id using record_conversation_usage. When the user ends practice, read get_conversation_context and save_conversation_review with exact recorded user evidence, corrections and next steps. Never ask to paste speech already visible in this chat. Do not claim access to unavailable voice transcripts. No API model calls. Image vision is done by host, then import_words_from_image stages real recognized items.';
 const skillPath=new URL('../skills/vocabulary-context/SKILL.md',import.meta.url || 'file:///bundle/server/index.mjs');
 const skillUri='skill://vocabulary-context/vocabulary-context/SKILL.md';
 
 export function createMcp(service,config) {
-  const server=new McpServer({name:'vocabulary-context',version:'0.1.2'},{instructions:workflow+' Never claim the learning UI opened from a successful tool response alone; the client must successfully load and display its resource.',capabilities:{extensions:{'io.modelcontextprotocol/skills':{}}}});
+  const server=new McpServer({name:'vocabulary-context',version:'0.1.3'},{instructions:workflow+' Never claim the learning UI opened from a successful tool response alone; the client must successfully load and display its resource.',capabilities:{extensions:{'io.modelcontextprotocol/skills':{}}}});
   for(const [index,uri] of [UI_URI,...UI_COMPAT_URIS].entries()) {
     // Keep prior URIs readable for hosts with cached descriptors. Personal development
     // uses ChatGPT's default sandbox; the tunnel origin is not a hosted component domain.
@@ -30,7 +31,7 @@ export function createMcp(service,config) {
   server.server.setRequestHandler(z.object({method:z.literal('skills/list'),params:z.object({cursor:z.string().optional()}).optional()}),async()=>({skills:[entry()]}));
   server.server.setRequestHandler(z.object({method:z.literal('skills/get'),params:z.object({uri:z.literal(skillUri)})}),async()=>({skill:entry()}));
   for(const t of tools) {
-    server.registerTool(t.name,{title:t.title,description:t.description,inputSchema:t.inputSchema,outputSchema:t.outputSchema,annotations:t.annotations,_meta:{...(t.ui?{ui:{resourceUri:UI_URI},'openai/outputTemplate':UI_URI,'openai/widgetAccessible':true}:{})}},async(args)=>{
+    server.registerTool(t.name,{title:t.title,description:t.description,inputSchema:t.inputSchema,outputSchema:t.outputSchema,annotations:t.annotations,_meta:{...(t.ui?{ui:{resourceUri:UI_URI},'openai/outputTemplate':UI_URI,'openai/widgetAccessible':true}:{}),...(t.name==='update_familiarity'?{ui:{visibility:['model','app']},'openai/widgetAccessible':true}:{})}},async(args)=>{
       try {
         const result=await service.execute(t.name,args);
         const summary=t.name==='open_workspace'?'词库数据已读取；这不代表宿主已成功展示学习界面，请检查组件实际加载结果。':result.article?`${result.article.title} · lesson_id=${result.article.lesson_id}`:result.generation?`generation_id=${result.generation.id}；只有 status=saved 才表示文章已保存。`:result.saved_count!==undefined?`已保存 ${result.saved_count} 个词。`:result.valid!==undefined?`校验${result.valid?'通过':'未通过'}；请读取 structuredContent。`:`${t.title}完成；请读取 structuredContent。`;
@@ -62,7 +63,7 @@ export function createRuntime(options={}) {
   app.use((req,res,next)=>{res.set('X-Content-Type-Options','nosniff');res.set('Referrer-Policy','no-referrer');res.set('Cache-Control','no-store');next();});
   app.use(express.json({limit:'3mb'}));app.use(express.urlencoded({extended:false,limit:'16kb'}));
   auth.install(app);
-  app.get('/health',(_req,res)=>res.json({ok:true,service:'vocabulary-context',version:'0.1.2',model_path:'host-subscription-only',login_configured:config.ownerPassword.length>=20}));
+  app.get('/health',(_req,res)=>res.json({ok:true,service:'vocabulary-context',version:'0.1.3',ui_version:UI_VERSION,model_path:'host-subscription-only',login_configured:config.ownerPassword.length>=20}));
   const active=new Set();
   app.post('/mcp',auth.checkRequest,async(req,res)=>{
     const started=performance.now(),method=req.body?.method;

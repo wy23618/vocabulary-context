@@ -7,8 +7,9 @@ import { randomBytes,createHash } from 'node:crypto';
 import { createServer } from 'node:http';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
-import { createRuntime,UI_URI,UI_COMPAT_URIS } from '../server/index.mjs';
+import { createRuntime,UI_URI } from '../server/index.mjs';
 import { tools } from '../server/schemas.mjs';
+import { UI_VERSION } from '../shared/ui-version.mjs';
 
 export async function login(base,password,redirect,consentOrigin=base) {
   const registration=await fetch(`${base}/oauth/register`,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({redirect_uris:[redirect],token_endpoint_auth_method:'none'})});
@@ -56,8 +57,14 @@ test('cached mobile UI descriptors retain readable resources and default sandbox
   const catalog=await client.listTools(),workspaceTool=catalog.tools.find(x=>x.name==='open_workspace');
   assert.equal(workspaceTool._meta.ui.resourceUri,UI_URI);
   assert.equal(workspaceTool._meta['openai/outputTemplate'],UI_URI);
+  const familiarityTool=catalog.tools.find(x=>x.name==='update_familiarity');
+  assert.deepEqual(familiarityTool._meta.ui.visibility,['model','app']);
+  assert.equal(familiarityTool._meta['openai/widgetAccessible'],true);
+  assert.equal(familiarityTool._meta['openai/outputTemplate'],undefined);
   let currentHtml;
-  for(const uri of [UI_URI,...UI_COMPAT_URIS]){
+  // Exercise all historical URIs rather than trusting the server's compat list.
+  for(let version=1;version<=UI_VERSION;version++){
+    const uri=`ui://vocabulary-context/v${version}/reader.html`;
     const resource=await client.readResource({uri}),entry=resource.contents[0];
     assert.equal(entry.uri,uri);assert.equal(entry.mimeType,'text/html;profile=mcp-app');assert.match(entry.text,/Vocabulary Context/);
     assert.equal(entry._meta.ui.domain,undefined);assert.equal(entry._meta['openai/widgetDomain'],undefined);
