@@ -29,23 +29,19 @@ try {
   page = await context.newPage(); page.on('pageerror', e => errors.push(e.message));
   let ui = await connected(page);
   await check('empty library renders through actual MCP App initialize/tools bridge', async () => { await ui.getByText('从今天的几个词开始').waitFor(); await expect(ui.locator('[data-ui-version]')).toHaveText(`界面 v${UI_VERSION}`); await noOverflow(ui); await page.screenshot({ path: path.join(output, 'empty-tablet.png') }); });
-  await check('text import, duplicate preview, editable confirmation, true persistence', async () => {
-    await ui.getByRole('button', { name: '＋ 加入单词' }).click();
-    await ui.getByRole('textbox', { name: '输入或粘贴单词' }).fill('compelling\nretain\ndiminish\nimpose\nconventional\nretain');
-    await ui.getByRole('button', { name: '检查并确认' }).click();
-    await ui.getByText('5 个候选词').waitFor();
-    await ui.getByRole('textbox', { name: 'compelling 中文笔记' }).fill('有说服力的；令人信服的');
-    await page.screenshot({ path: path.join(output, 'import-confirm-tablet.png') });
-    await ui.getByRole('button', { name: '确认加入 5 个词' }).click();
-    await ui.getByText('已保存 5 个词。', { exact: true }).waitFor();
+  await check('one-step typed import, deduplication and true persistence', async () => {
+    await ui.getByRole('button', { name: '＋ 录入新词' }).click();
+    await ui.getByRole('textbox', { name: '输入或粘贴单词' }).fill('compelling: 有说服力的与令人信服的\nretain\ndiminish\nimpose\nconventional\nretain');
+    await ui.getByRole('button', { name: '保存到词库' }).click();
+    await ui.getByText('已保存 5 个新词，勾选就能开始练习。', { exact: true }).waitFor();
     assert.equal((await service.execute('list_words')).words.length, 5);
     await page.screenshot({ path: path.join(output, 'library-tablet.png') });
   });
   await check('level update, real readd downgrade preview and restore original', async () => {
     await ui.getByRole('combobox', { name: 'retain 熟练度', exact: true }).selectOption('4');
     await ui.getByText('已保存。', { exact: true }).waitFor();
-    await ui.getByRole('button', { name: '＋ 加入单词' }).click(); await ui.getByRole('textbox', { name: '输入或粘贴单词' }).fill('retain'); await ui.getByRole('button', { name: '检查并确认' }).click();
-    await ui.getByText('已存在 · 再次加入 4 → 3').waitFor();
+    await ui.getByRole('button', { name: '＋ 录入新词' }).click(); await ui.getByRole('textbox', { name: '输入或粘贴单词' }).fill('retain'); await ui.getByRole('button', { name: '保存到词库' }).click();
+    await ui.getByText('已在词库 · Lv.5 → Lv.4').waitFor();
     await ui.getByRole('button', { name: '恢复原等级' }).click();
     await ui.getByRole('button', { name: '确认加入 1 个词' }).click();
     await ui.getByText('已保存 1 个词。', { exact: true }).waitFor();
@@ -54,21 +50,27 @@ try {
   });
   await check('library immediate filters, no result state and keyboard access', async () => { await ui.getByRole('searchbox').fill('nonexistentword'); await ui.getByText('暂时没有匹配的词').waitFor(); await ui.getByRole('searchbox').fill(''); await ui.getByRole('combobox', { name: '加入时间' }).click(); await ui.getByRole('option', { name: '今天', exact: true }).click(); await ui.getByRole('combobox', { name: 'retain 熟练度', exact: true }).waitFor(); });
   await check('offline save failure keeps input and lets user recover', async () => {
-    harness.setOffline(true); await ui.getByRole('button', { name: '＋ 加入单词' }).click(); await ui.getByRole('textbox', { name: '输入或粘贴单词' }).fill('evidence'); await ui.getByRole('button', { name: '检查并确认' }).click(); await ui.getByText('词库服务不可达。输入已保留，请稍后重试。').last().waitFor(); assert.equal(await ui.getByRole('textbox', { name: '输入或粘贴单词' }).inputValue(), 'evidence');
-    harness.setOffline('transport'); await ui.getByRole('button', { name: '检查并确认' }).click(); await ui.getByText('词库服务暂时不可达，尚未确认的操作没有显示为已保存。输入和当前页面已保留；服务恢复后点“重新连接”再试。').first().waitFor(); await ui.locator('header').getByText('词库暂不可达', { exact: true }).waitFor(); assert.equal(await ui.getByRole('textbox', { name: '输入或粘贴单词' }).inputValue(), 'evidence');
-    harness.setOffline(false); const modalReconnect = ui.getByRole('dialog', { name: '加入今天的词' }).getByRole('button', { name: '重新连接词库' }); await expect(modalReconnect).toBeEnabled(); await modalReconnect.click(); await ui.getByText('已重新连接并读取保存数据。').waitFor(); await ui.getByText('词库已连接', { exact: true }).waitFor(); await ui.getByRole('button', { name: '关闭单词导入' }).click();
+    harness.setOffline(true); await ui.getByRole('button', { name: '＋ 录入新词' }).click(); await ui.getByRole('textbox', { name: '输入或粘贴单词' }).fill('evidence'); await ui.getByRole('button', { name: '保存到词库' }).click(); await ui.getByText('词库服务不可达。输入已保留，请稍后重试。').last().waitFor(); assert.equal(await ui.getByRole('textbox', { name: '输入或粘贴单词' }).inputValue(), 'evidence');
+    harness.setOffline('transport'); await ui.getByRole('button', { name: '保存到词库' }).click(); await ui.getByText('词库服务暂时不可达，尚未确认的操作没有显示为已保存。输入和当前页面已保留；服务恢复后点“重新连接”再试。').first().waitFor(); await ui.locator('header').getByText('词库暂不可达', { exact: true }).waitFor(); assert.equal(await ui.getByRole('textbox', { name: '输入或粘贴单词' }).inputValue(), 'evidence');
+    harness.setOffline(false); const modalReconnect = ui.getByRole('dialog', { name: '录入新词' }).getByRole('button', { name: '重新连接词库' }); await expect(modalReconnect).toBeEnabled(); await modalReconnect.click(); await ui.getByText('已重新连接并读取保存数据。').waitFor(); await ui.getByText('词库已连接', { exact: true }).waitFor(); await ui.getByRole('button', { name: '关闭单词导入' }).click();
   });
   await check('image import reports unsupported host upload and never pretends recognition occurred', async () => {
-    const before = (await service.execute('list_words')).words.length; await ui.getByRole('button', { name: '＋ 加入单词' }).click();
+    const before = (await service.execute('list_words')).words.length; await ui.getByRole('button', { name: '＋ 录入新词' }).click();
     await ui.locator('input[type="file"]').setInputFiles({ name: 'vocabulary.png', mimeType: 'image/png', buffer: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/lfoAAAAASUVORK5CYII=', 'base64') });
     await ui.getByText('此宿主尚未提供图片上传接口。请在 ChatGPT 聊天中附上图片并说“识别这些词，交给 Vocabulary Context 确认”。识别后会回到确认界面。').first().waitFor();
     assert.equal((await service.execute('list_words')).words.length, before); await ui.getByRole('button', { name: '关闭单词导入' }).click();
   });
-  await check('today prioritized, old words selected programmatically and reroll preserves fixed words', async () => {
+  await check('optional today/review shortcuts preserve explicit words', async () => {
     clock = '2026-10-01T04:00:00Z'; let batch = await direct('add_words', { text: 'resilient ambiguous sustain credible durable adapt negotiate' }); await direct('confirm_import', { import_id: batch.import_id, items: batch.items }); clock = '2026-10-14T04:00:00Z';
-    await ui.getByRole('button', { name: '选择目标词', exact: true }).click(); await ui.getByRole('heading', { name: '阅读，从这组词开始' }).waitFor();
-    const before = (await service.execute('get_selection')).selection; assert.equal(before.words.filter(w => w.sources.includes('today')).length, 5); assert.equal(before.words.filter(w => w.sources.includes('auto')).length, 4);
-    await ui.getByRole('button', { name: '换一批旧词' }).click(); await ui.getByText('已更换可替换的旧词；今日词和手动必选词保留。').waitFor(); const after = (await service.execute('get_selection')).selection; assert.deepEqual(after.words.filter(w => w.sources.includes('today')).map(w => w.id), before.words.filter(w => w.sources.includes('today')).map(w => w.id));
+    await ui.locator('.session-suggestions summary').click();
+    await ui.getByRole('button', {name:'选中今天的词',exact:true}).click();
+    await ui.locator('.session-suggestions summary').click();
+    await ui.getByRole('button', {name:'补充 4 个复习词',exact:true}).click();
+    await expect.poll(async () => (await service.execute('get_selection')).selection?.words.length).toBe(9);
+    const picked = (await service.execute('get_selection')).selection;
+    assert.equal(picked.words.filter(w => w.sources.includes('manual')).length, 5);
+    assert.equal(picked.words.filter(w => w.sources.includes('auto')).length, 4);
+    await ui.getByRole('button', {name:'阅读',exact:true}).click();
     await page.screenshot({ path: path.join(output, 'selection-tablet.png') });
   });
   await check('conversation start sends setup into chat and does not count fake usage', async () => {
@@ -85,8 +87,8 @@ try {
     await page.screenshot({ path: path.join(output, 'conversation-desktop.png') });
   });
   await check('real generation handoff preserves pending state until actual saved article', async () => {
-    await ui.getByRole('button', { name: '词库', exact: true }).click(); await ui.getByRole('spinbutton').fill('0'); await ui.getByRole('button', { name: '选择目标词', exact: true }).click(); await ui.getByLabel('篇幅', { exact: true }).selectOption('short');
-    await ui.getByRole('button', { name: '用这组词生成文章' }).click(); await ui.getByRole('button', { name: '等待 ChatGPT 完成文章…' }).waitFor(); assert.equal((await service.execute('list_articles')).articles.length, 0); assert.ok(harness.messages.at(-1).content[0].text.includes('save_article'));
+    await ui.getByRole('button', { name: '词库', exact: true }).click(); await ui.getByRole('button',{name:'清空勾选',exact:true}).click(); await ui.locator('.session-suggestions summary').click(); await ui.getByRole('button',{name:'选中今天的词',exact:true}).click(); await ui.getByRole('button',{name:'阅读',exact:true}).click(); await ui.getByLabel('篇幅', { exact: true }).selectOption('short');
+    await ui.getByRole('button', { name: '生成阅读' }).click(); await ui.getByRole('button', { name: '等待 ChatGPT 完成文章…' }).waitFor(); assert.equal((await service.execute('list_articles')).articles.length, 0); assert.ok(harness.messages.at(-1).content[0].text.includes('save_article'));
   });
   // Original development model-written article and occurrence glosses are not an app fallback.
   const { buildReviewDraft } = await import('./fixtures/review-draft.mjs');
@@ -140,8 +142,8 @@ try {
   await check('every task remains reachable in narrow host containers; import form does not overflow', async () => {
     for (const width of [600, 320]) {
       await page.setViewportSize({ width, height: 820 });
-      for (const task of ['词库', '目标词与阅读', '英语交流', '历史文章']) { await ui.getByRole('button', { name: task, exact: true }).click(); await noOverflow(ui); }
-      await ui.getByRole('button', { name: '词库', exact: true }).click(); await ui.getByRole('button', { name: '＋ 加入单词' }).click(); if (!await ui.getByRole('textbox', { name: '输入或粘贴单词' }).count()) await ui.getByRole('button', { name: '重新输入' }).click(); await ui.getByRole('textbox', { name: '输入或粘贴单词' }).fill('evidence\nretain'); await ui.getByRole('button', { name: '检查并确认' }).click(); await ui.getByRole('button', { name: '确认加入 2 个词' }).waitFor(); await noOverflow(ui); await ui.getByRole('button', { name: '关闭单词导入' }).click();
+      for (const task of ['词库', '阅读', '英语交流', '历史文章']) { await ui.getByRole('button', { name: task, exact: true }).click(); await noOverflow(ui); }
+      await ui.getByRole('button', { name: '词库', exact: true }).click(); await ui.getByRole('button', { name: '＋ 录入新词' }).click(); if (!await ui.getByRole('textbox', { name: '输入或粘贴单词' }).count()) await ui.getByRole('button', { name: '重新输入' }).click(); await ui.getByRole('textbox', { name: '输入或粘贴单词' }).fill('evidence\nretain'); await ui.getByRole('button', { name: '保存到词库' }).click(); await ui.getByRole('button', { name: '确认加入 2 个词' }).waitFor(); await noOverflow(ui); await ui.getByRole('button', { name: '关闭单词导入' }).click();
     }
     await page.setViewportSize({ width: 1180, height: 820 }); await ui.getByRole('button', { name: '历史文章', exact: true }).click(); await ui.getByRole('button', { name: new RegExp(article.title) }).click(); await page.waitForTimeout(1200);
   });
@@ -165,7 +167,7 @@ try {
   await check('high load has actionable frozen split plan, preserves entire set, host handoff never claims unsaved completion', async () => {
     const wordIds = (await service.execute('list_words')).words.map(word => word.id);
     const { selection } = await direct('select_target_words', { mode: 'manual', manual_ids: wordIds });
-    ui = await connected(page); await ui.getByRole('button', { name: '目标词与阅读', exact: true }).click(); await ui.getByLabel('篇幅', { exact: true }).selectOption('short');
+    ui = await connected(page); await ui.getByRole('button', { name: '阅读', exact: true }).click(); await ui.getByLabel('篇幅', { exact: true }).selectOption('short');
     await ui.getByRole('button', { name: '分为多篇生成', exact: true }).waitFor(); await ui.getByRole('button', { name: '分为多篇生成', exact: true }).click();
     await ui.getByText(/全部实际保存后才确认整组完成/).waitFor();
     const plan = service.repository.objects('split_plan').at(-1); assert.ok(plan.parts.length >= 2); assert.deepEqual(new Set(plan.parts.flatMap(part => part.words.map(word => word.id))), new Set(wordIds)); assert.equal((await service.execute('get_selection')).selection.id, selection.id);

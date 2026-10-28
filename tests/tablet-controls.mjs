@@ -102,7 +102,7 @@ try {
     await expect(checkbox).toBeChecked();await checkbox.click();await expect(checkbox).not.toBeChecked();
   }
   await expect(ui.getByRole('heading',{name:'英语交流',exact:true})).toBeVisible();
-  assert.equal((await call('get_selection')).selection.words.length,0);
+  await expect.poll(async ()=>(await call('get_selection')).selection.words.length).toBe(0);
   await ui.getByLabel('话题',{exact:true}).fill('关于爱');
   await expect(ui.getByRole('textbox',{name:'自定义开场白',exact:true})).toHaveValue(/love/);
   const messagesBeforeFree=harness.messages.length;
@@ -119,7 +119,7 @@ try {
   await expect(ui.getByRole('checkbox',{name:'交流用词 retain',exact:true})).toBeChecked();
   await expect(ui.locator('.voice-ready')).toHaveCount(0);
   await expect(ui.getByRole('heading',{name:'英语交流',exact:true})).toBeVisible();
-  assert.equal((await call('get_selection')).selection.words[0].word,'retain');
+  await expect.poll(async ()=>(await call('get_selection')).selection.words[0]?.word).toBe('retain');
   await page.screenshot({path:'docs/previews/conversation-inline-picker.png'});
   assert.deepEqual(errors,[]);
   console.log('Tablet controls verified: downward popover, viewport bounds, keyboard and dismissal, equal glyph geometry, single conversation handoff with full context, no fabricated usage.');

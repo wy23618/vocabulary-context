@@ -129,3 +129,18 @@ UI 用户选择文件时，可检查 `window.openai.uploadFile` / `getFileDownlo
 ### 2026-10-18：最终交流启动流程
 
 点击“开始交流”后保存主题、开场白、模式与目标词，并通过 `ui/message` 自动发送一条完整准备消息。ChatGPT 在文字中只确认“好，我们开始吧。”；用户手动打开同一聊天的语音，第一次语音回应使用指定英文开场白。准备消息和确认回复不计入练习记录。流程不调用 `ui/update-model-context`，避免输入框出现重复的待提交上下文卡片。界面只能确认消息请求被宿主接受，不能据此证明模型已回复或 Voice 已连接；原生 Voice 的主题承接仍需端到端验收。
+### 2026-10-19：v16 测试连接恢复
+
+原 Quick Tunnel 进程停止后，原“Elis 本地测试”仍保留已失效的服务地址，实际调用返回 `-32603`。恢复本地服务时，通过 `VOCAB_LOCAL_RUNTIME_DIR` 继续使用原 `.runtime/elis-local`，保留测试词库和已有授权数据，同时从当前工作区提供 v16 代码。新 HTTPS 通道通过匿名访问限制、OAuth/PKCE、32 个 MCP 工具发现及 v16 资源读取检查。
+
+现有应用设置页没有修改 URL 的入口，插件包仅绑定 App ID，因此保留旧连接，建立独立替代入口“**Elis 本地测试 v16**”（`asdk_app_6ad5c5e1ed48819196e69750b55274df`），完成真实 ChatGPT OAuth 授权。真实网页宿主调用 `open_workspace` 成功，实际 iframe 显示“词库已连接”“界面 v16”，恢复原 12 个测试词与 9 个已选词，词库操作栏显示“勾选即生效，直接开始”。仅执行只读打开和页面切换，未更改单词、熟练度或开始学习任务。截图：`previews/local-v16-connection-confirmed.png`。
+
+这是临时本地通道，仍需电脑和通道进程保持运行。此记录验证网页宿主加载，不代表原生 Voice 或平板实机验收已完成。
+
+### 2026-10-22：v17 平板窄框与展开入口修复
+
+用户报告 v16 在平板只显示窄框、没有展开入口，电脑可用。代码复核发现三处缺口：展开按钮依赖宿主 `availableDisplayModes`；窄屏样式隐藏所有 quiet 顶栏按钮，低高度横屏还会隐藏整个顶栏；固定 `100dvh` 配合回报当前框高度可能让初始占位框保持折叠。
+
+v17 在 App 初始化声明 inline/fullscreen 能力，保留显式展开入口，优先使用可检测的原生 `window.openai.requestDisplayMode`，再兼容标准 MCP 请求，并尊重宿主实际授予的模式。极矮 inline 框主动请求可阅读高度，通过标准 size-changed 和可用的 `notifyIntrinsicHeight` 回报；若宿主不调整高度，显示完整的紧凑词库预览卡片并允许 iframe 内滚动。真实短横屏在导航保留展开按钮。尺寸与主题订阅包含宿主上下文、原生 globals 和窗口变化。
+
+`npm run test:mobile-viewport` 覆盖缺省能力、原生全屏、拒绝全屏、初始 160/180 像素框、受限卡片滚动选词、尺寸反馈稳定性及横竖屏切换；`test:polish` 验收 8 种尺寸、设置和弹层；业务 44 项、选词流程和 Workers 运行时验收通过。截图为本地协议宿主模拟，不是用户平板实机证据。用户需关闭旧卡片，在新聊天重新打开正式 Elis 并确认界面 v17；本次尚未取得修复后的平板实机截图。接口依据：[OpenAI 官方运行时参考](https://developers.openai.com/plugins/reference)。

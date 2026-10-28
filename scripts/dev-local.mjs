@@ -7,7 +7,12 @@ import { fileURLToPath } from 'node:url';
 import { resolve, join } from 'node:path';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
-const runtimeDir = join(root, '.runtime', 'elis-local');
+const runtimeDir = process.env.VOCAB_LOCAL_RUNTIME_DIR
+  ? resolve(process.env.VOCAB_LOCAL_RUNTIME_DIR)
+  : join(root, '.runtime', 'elis-local');
+if (!runtimeDir.split(/[\\/]/).includes('.runtime')) {
+  throw new Error('Local test runtime must be inside a .runtime directory.');
+}
 const port = 8789;
 const children = [];
 let watcher, rebuildTimer, stopping = false;
@@ -96,7 +101,7 @@ try {
   const envText = ['HOST', 'PORT', 'VOCAB_DATA_DIR', 'VOCAB_PUBLIC_URL', 'VOCAB_OWNER_PASSWORD', 'VOCAB_REDIRECT_URIS', 'VOCAB_LOCAL_INSTANCE_ID'].map(key => `${key}=${env[key].replaceAll('\\', '/')}`).join('\n');
   await writeFile(join(runtimeDir, '.env'), envText + '\n', { mode: 0o600 });
   const serverLog = await open(join(runtimeDir, 'server.log'), 'a');
-  const server = spawn(process.execPath, ['--watch', '--watch-preserve-output', 'scripts/local-test-server.mjs'], { cwd: root, env, windowsHide: true, stdio: ['ignore', serverLog.fd, serverLog.fd] });
+  const server = spawn(process.execPath, ['--watch', '--watch-preserve-output', '--watch-path', join(root, 'server'), '--watch-path', join(root, 'shared'), '--watch-path', join(root, 'scripts', 'local-test-server.mjs'), 'scripts/local-test-server.mjs'], { cwd: root, env, windowsHide: true, stdio: ['ignore', serverLog.fd, serverLog.fd] });
   children.push(server);
   server.on('error', error => { console.error(error.message); stop(1); });
   let ready = false;
@@ -117,8 +122,8 @@ try {
   tunnel.once('exit', () => { if (!stopping) { console.error('HTTPS tunnel stopped. Restart npm run dev:local.'); stop(1); } });
   console.log(`\nElis LOCAL TEST ready: ${origin}/mcp`);
   console.log('Source changes restart the local server; UI changes rebuild automatically.');
-  console.log('Test data: .runtime/elis-local/data (separate from online data).');
-  console.log('Password file: .runtime/elis-local/owner-password.txt (never printed).');
+  console.log(`Test data: ${join(runtimeDir, 'data')} (separate from online data).`);
+  console.log(`Password file: ${passwordPath} (never printed).`);
   console.log('Keep this command running. Ctrl+C stops local testing. A new tunnel session has a new address.');
 } catch (error) {
   console.error(error.message);

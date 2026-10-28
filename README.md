@@ -8,8 +8,8 @@
 
 ## 核心功能
 
-- 手动、批量或由宿主识别图片导入单词，逐项确认后保存。
-- 五档熟练度、今日词与旧词筛选、反复遗忘记录、目标词换批。
+- 界面录入普通新词一次保存；重复词和图片识别结果先核对。宿主发起的导入仍先展示核对界面。
+- 五档熟练度、今日词与旧词筛选、反复遗忘记录；勾选即为本次用词，直接开始阅读或交流，无需准备和确认词组。
 - 按主题、篇幅与难度准备文章，校验词汇覆盖和位置标注后保存，支持历史重开。
 - 每个出现位置独立的中文释义、学习反馈、撤销与阅读位置恢复。
 - 独立英语交流流程；在已启用的交流中依据真实对话收录不理解的词。
@@ -70,6 +70,10 @@ npm run dev:local
 
 Windows 也可以双击 `scripts/Start-LocalTest.cmd`。已启动时会提示现有测试地址，不会重复启动服务。
 
+需要关闭或重启 Codex 后继续测试时，运行 `./scripts/Start-LocalTest.ps1`，由 Windows 创建仅按需运行的独立后台进程，不保存 Windows 密码，也不添加定时或登录触发器。可用 `-RuntimeDirectory` 指定原有 `.runtime/elis-local`；用 `Stop-ScheduledTask -TaskName Elis-LocalTest` 停止。该方式仍是临时 HTTPS 通道，停止通道或重启电脑后地址会变化。
+
+在另一个工作区测试新版代码时，可将 `VOCAB_LOCAL_RUNTIME_DIR` 设为原项目的 `.runtime/elis-local` 绝对路径，再启动命令，以保留已有测试词库和授权数据。目录必须位于 `.runtime` 内；不能指向正式词库。
+
 启动独立本地 MCP 和 HTTPS 测试隧道，在 ChatGPT 单独创建 **Elis 本地测试**，填写命令输出的 `/mcp` 地址并使用 OAuth。首次授权密码保存在 `.runtime/elis-local/owner-password.txt`，不要提交或分享此文件。测试词库独立保存在 `.runtime/elis-local/data/`，不读取线上词库或正式 `.env`，也不修改正式插件连接。
 
 保持启动命令运行。修改服务端代码会自动重启本地服务；修改界面会自动构建，在 ChatGPT 重新打开测试版词库即可读取新界面。修改工具定义后在测试插件设置中刷新工具。按 `Ctrl+C` 停止；测试数据保留。临时隧道每次重新启动会换地址，需要更新或重建测试连接，不能用作正式发布地址。测试满意后再推送 `main` 发布正式版。
@@ -79,12 +83,16 @@ npm test                 # 业务、认证、协议与本地备份
 npm run build            # 构建自包含 MCP App HTML
 npm run test:cloudflare  # 打包并验收真实 Workers / Durable Object 运行时
 npm run test:ui          # 桌面、平板、窄屏交互，使用合成数据
+npm run test:polish      # 设置保存、批量勾选与八种横竖屏布局
+npm run test:flow        # 勾选即用、直接开始、慢网络与失败恢复
 npm run package          # 生成供宿主安装的插件包
 ```
 
 打包前通过 `scripts/configure-endpoint.mjs` 配置实际 MCP HTTPS 地址。源码及安装包不应包含真实 `.env`、数据库、日志或私有连接记录。本地调试与备份操作见 [本地开发说明](docs/LOCAL-DEVELOPMENT.md)。
 
 ## 技术栈与结构
+
+页面分工、按钮层级、横竖屏规则与设置保存行为见 [体验设计说明](docs/EXPERIENCE-DESIGN.md)。
 
 React · MCP SDK / MCP Apps · Zod · Express · SQLite · esbuild · Playwright · Cloudflare Workers / Durable Objects
 

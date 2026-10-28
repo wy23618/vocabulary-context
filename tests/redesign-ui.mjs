@@ -35,12 +35,12 @@ try {
     await page.setViewportSize({width,height:854});
     const rows=ui.locator('.word-row');
     const a=await rows.nth(0).boundingBox(),b=await rows.nth(1).boundingBox();
-    if(width>=820){
+    if(width>=1100){
       assert.ok(Math.abs(a.y-b.y)<1 && b.x>a.x+a.width,'Wide library must show two word columns');
-    }else assert.ok(b.y>=a.y+a.height,'Narrow library must keep readable single-column words');
+    }else assert.ok(b.y>=a.y+a.height,'Narrow library and tablets with a session sidebar must keep readable single-column words');
     const panel=await ui.locator('.library-main').boundingBox();
     const list=await ui.locator('.word-list').boundingBox();
-    assert.ok(list.height/panel.height>0.65,'Words must occupy most of the library card');
+    assert.ok(list.height/panel.height>0.55,'Words must occupy most of the library card');
   }
   await page.setViewportSize({width:1280,height:960});
   const first=ui.locator('.word-row').first();const firstWord=await first.locator('strong').textContent();
@@ -53,9 +53,7 @@ try {
   await ui.getByLabel('每页词数',{exact:true}).selectOption('12');
   await expect(ui.getByRole('button',{name:'自动',exact:true})).toHaveCount(0);
   await expect(ui.getByRole('button',{name:'混合',exact:true})).toHaveCount(0);
-  await ui.getByRole('checkbox',{name:'带上今天加入的词',exact:true}).uncheck();
-  await ui.getByRole('spinbutton',{name:'复习旧词数量',exact:true}).fill('0');
-  await ui.getByRole('button',{name:'选择目标词',exact:true}).click();
+  await expect.poll(async () => (await call('get_selection')).selection?.words.length).toBe(added.words.length+1);
   const picked=(await call('get_selection')).selection;assert.deepEqual(picked.words.map(w=>w.word),[...added.words.map(w=>w.word),firstWord]);assert.equal(picked.include_today,false);
   await ui.getByRole('button',{name:'词库',exact:true}).click();
   await mkdir('docs/previews',{recursive:true});await page.screenshot({path:'docs/previews/redesign-library.png'});
@@ -116,16 +114,16 @@ try {
   await page.screenshot({path:'docs/previews/redesign-dictionary.png'});
   for(const [width,height] of [[320,680],[600,820],[820,1180],[1440,900],[1180,480]]){
     await page.setViewportSize({width,height});
-    for(const task of ['词库','目标词与阅读','英语交流','历史文章']){
+    for(const task of ['词库','阅读','英语交流','历史文章']){
       await ui.getByRole('button',{name:task,exact:true}).click();
       const dims=await ui.locator('html').evaluate(el=>({w:el.clientWidth,sw:el.scrollWidth,h:el.clientHeight,sh:el.scrollHeight}));assert.ok(dims.sw<=dims.w+1);assert.ok(dims.sh<=dims.h+1,`Document scroll in ${task}: ${dims.sh}/${dims.h}`);
-      if(task==='词库'&&width<=790){await ui.getByRole('button',{name:'准备词组 →'}).click();await expect(ui.getByRole('heading',{name:'这次学哪些词'})).toBeVisible();await ui.getByRole('button',{name:'← 返回词库'}).click();}
+      if(task==='词库'){await expect(ui.locator('.session-dock')).toBeInViewport();}
     }
   }
   // Waiting for the host model should produce no recurring resize notifications.
   await page.setViewportSize({width:1280,height:960});
-  await ui.getByRole('button',{name:'目标词与阅读',exact:true}).click();
-  await ui.getByRole('button',{name:'用这组词生成文章'}).click();
+  await ui.getByRole('button',{name:'阅读',exact:true}).click();
+  await ui.getByRole('button',{name:'生成阅读'}).click();
   await ui.getByRole('button',{name:'等待 ChatGPT 完成文章…'}).waitFor();
   await page.waitForTimeout(250);
   const geometry=await ui.locator('.app-shell').evaluate(el=>({height:el.offsetHeight,top:el.getBoundingClientRect().top}));

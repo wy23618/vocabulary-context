@@ -1,10 +1,20 @@
 # Vocabulary Context · Cloudflare
 
-## 当前状态（2026-10-15）
+## v19 发布（2026-10-28）
+
+v19 保留原来的米白与森林绿，调整选词卡片、筛选层级、练习侧栏、手机底部操作栏，并统一阅读、交流、历史与设置的视觉样式。详细设计见 [学习体验说明](EXPERIENCE-DESIGN.md)。
+
+本地构建、44 项业务测试、19 项 UI 检查、选词流程、平板控件、移动宿主、响应式布局、原配色与练习侧栏专项，以及 Workers 运行时检查通过。发布沿用 `main` 推送后的 GitHub Actions；现有仓库已配置 `CLOUDFLARE_API_TOKEN` 和 `CLOUDFLARE_ACCOUNT_ID`，无需在本机重新登录 Wrangler。以对应 Actions 完成结果及正式 `/health` 的 `ui_version:19` 为服务器发布证据；实际宿主界面仍应单独检查。
+
+## 既有发布记录（2026-10-22）
 
 本地 44 项业务/认证/协议测试、19 项 UI 验收通过。Workers 打包通过；真实 Workers 运行时已验收 OAuth / PKCE、MCP 工具、词库写入、版本冲突回滚与 UI/Skill 资源读取。2026-10-18 已部署 0.1.3（界面 v14）至 Cloudflare Workers，并完成 HTTPS、健康检查和匿名保护验证；既有 Durable Object 词库保持不变。
 
+2026-10-22 已按用户请求将界面 v16 发布到现有正式 Worker，版本 ID：`e2222dd3-85c1-4ec3-9459-de57f8a8cee3`。本次构建、44 项业务测试、Workers 运行时验收和 7 种横竖屏选词流程验收通过；线上 `/health` 确认 v16、登录已配置，匿名 MCP 返回 401，OAuth issuer 保持正式域名。已通过正式 Elis 连接只读调用 `open_workspace` 成功；本次线上验证未执行学习写入，也未单独复测平板宿主显示。复用现有 Durable Object 类、绑定和数据实例，无本地测试词库迁移。
+
 正式 MCP 地址：[`https://vocab.hellovian.com/mcp`](https://vocab.hellovian.com/mcp)。备用入口：`https://vocabulary-context.hellovian.workers.dev/mcp`。`/health` 返回 200 且账号登录已配置，匿名 MCP 请求返回 401。
+
+同日已追加发布平板显示修复 v17，Worker 版本 ID：`3b98bc0d-0859-498a-a955-5207dfedc3af`。修复窄框高度回报、被响应式样式隐藏的展开入口，并兼容原生/标准全屏请求。新增移动宿主回归、8 种视口视觉与操作验收、44 项业务测试和 Workers 运行时检查通过。平板实机复测状态见 [宿主支持记录](HOST-SUPPORT.md#2026-10-22v17-平板窄框与展开入口修复)。
 
 ## 架构与发布
 
