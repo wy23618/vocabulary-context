@@ -15,7 +15,7 @@ const normalize=x=>String(x??'').normalize('NFKC').trim().toLowerCase().replace(
 const levels=['Lv.1','Lv.2','Lv.3','Lv.4','Lv.5'];
 const validLevel=n=>Number.isInteger(n)&&n>=0&&n<=4;
 const sources=new Set(['MANUAL','PASTE','IMAGE','SYSTEM']);
-const WRITE=new Set(['add_words','import_words_from_image','confirm_import','update_familiarity','remove_word','undo_event','select_target_words','reroll_auto_words','save_selection','prepare_article','prepare_split_articles','save_article','record_word_feedback','prepare_conversation','record_conversation_usage','save_conversation_review','save_sentence_analysis','save_preferences','save_word_details','capture_conversation_word']);
+const WRITE=new Set(['add_words','import_words_from_image','confirm_import','update_familiarity','remove_word','undo_event','select_target_words','reroll_auto_words','save_selection','prepare_article','prepare_split_articles','save_article','record_word_feedback','prepare_conversation','record_conversation_usage','save_conversation_review','save_sentence_analysis','save_preferences','save_word_details','save_article_phonetics','capture_conversation_word']);
 export const SELECTION_WEIGHTS={familiarity:[10,8,5,2,.5],load:[2,2,1.5,1,.5],strata:[.5,.3,.2]};
 const lengthRanges={short:[200,300],standard:[350,500],long:[550,750]};
 const dateKey=(value,zone)=>new Intl.DateTimeFormat('en-CA',{timeZone:zone,year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date(value));
@@ -158,6 +158,8 @@ export function createService({dataDir=loadConfig().dataDir,now=()=>new Date(),r
     // Content-token mapping completeness is explicit; function words do not require click affordances.
     const missing=tokens.filter(t=>!functionWords.has(normalize(t.text))&&!maps.some(m=>m.start<=t.start&&m.end>=t.end));
     if(missing.length)fail('ARTICLE_MAPPING','正文实义词仍缺少预生成释义，未保存。',{missing:missing.slice(0,20).map(t=>({word:t.text,start:t.start})),count:missing.length});
+    const missingPhonetics=maps.filter(m=>!m.phonetic?.trim());
+    if(missingPhonetics.length)fail('ARTICLE_PHONETIC','词语缺少音标，请补全后重新校验。',{missing:missingPhonetics.map(m=>({word:m.surface_form,token_index:m.token_index,start:m.start})),count:missingPhonetics.length});
     for(const feature of raw.syntax_features)check(typeof feature.sentence==='string'&&article.includes(feature.sentence)&&typeof feature.feature==='string'&&typeof feature.explanation==='string','句子分析与正文不一致。');
     return {lesson_id:id(),title:raw.title.trim(),topic:raw.topic??config.topic,article,target_words:selection.words,word_map:maps,syntax_features:raw.syntax_features,coverage,quality_checks:{...raw.quality_checks,programmatic:{all_targets_present:true,all_content_tokens_mapped:true,word_count:wordCount},note:'模型审阅与程序完整性检查分开记录，不提供权威评分。'},config,selection_id:selection.id,created_at:stamp(),word_count:wordCount};
   }
@@ -309,6 +311,13 @@ export function createService({dataDir=loadConfig().dataDir,now=()=>new Date(),r
         for(const gap of args.gaps){const turn=turns.find(turn=>turn.turn_id===gap.turn_id&&turn.actor==='user');check(turn&&turn.text.includes(gap.quote),'复盘原句必须来自对应的真实用户发言。');}
         const review={summary:args.summary,strengths:args.strengths,gaps:args.gaps,next_steps:args.next_steps,turn_count:turns.length,created_at:stamp()};
         repository.put('conversation',conversation.id,{...conversation,review});return {conversation_id:conversation.id,review};
+      }
+      case 'save_article_phonetics': {
+        const parsed=toolDefinitions.find(t=>t.name==='save_article_phonetics').inputSchema.safeParse(args);check(parsed.success,'请提供有效的文章和音标。');
+        const article=articleFor(args.lesson_id), updates=new Map();
+        for(const item of parsed.data.items){check(!updates.has(item.occurrence_id),'音标位置重复。');check(article.word_map.some(m=>m.occurrence_id===item.occurrence_id),'音标位置不存在。');updates.set(item.occurrence_id,item.phonetic.trim());}
+        let updated=0;const word_map=article.word_map.map(m=>{const phonetic=updates.get(m.occurrence_id);if(!phonetic||m.phonetic?.trim())return m;updated++;return {...m,phonetic};});
+        repository.put('article',article.lesson_id,{...article,word_map});return {lesson_id:article.lesson_id,updated,remaining:word_map.filter(m=>!m.phonetic?.trim()).length};
       }
       case 'save_word_details': {
         const parsed=toolDefinitions.find(t=>t.name==='save_word_details').inputSchema.safeParse(args);check(parsed.success,'词典资料格式不完整，请提供音标、释义、同根词、近义词及双语例句。');

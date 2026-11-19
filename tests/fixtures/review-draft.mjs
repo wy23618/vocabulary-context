@@ -148,7 +148,7 @@ export async function buildReviewDraft(service) {
   const tokens=service?(await service.execute('tokenize_article',{article:articleText})).tokens:[...articleText.matchAll(/[\p{L}]+(?:['’\-][\p{L}]+)*/gu)].map((m,index)=>({index,surface_form:m[0]}));
   const seen=new Map();const word_map=[];
   for(const token of tokens){const key=token.surface_form.toLowerCase(),definition=glossary.get(key);if(!definition){if(token.requires_mapping)throw new Error(`Unreviewed content word: ${token.surface_form}`);continue;}
-    const occurrence=seen.get(key)??0;seen.set(key,occurrence+1);word_map.push({token_index:token.index,surface_form:token.surface_form,...definition,...(occurrenceOverrides[key]?.[occurrence]??{}),target:targets.has(key)});
+    const occurrence=seen.get(key)??0;seen.set(key,occurrence+1);word_map.push({phonetic:"/test/",token_index:token.index,surface_form:token.surface_form,...definition,...(occurrenceOverrides[key]?.[occurrence]??{}),target:targets.has(key)});
   }
   return {title:'When Assistance Leaves Room for Judgment',topic:'AI与大学学习',article:articleText,word_map,syntax_features:[
     {sentence:'Yet the most compelling question is not whether students should use artificial intelligence, but which forms of assistance allow them to retain responsibility for their own thinking.',feature:'并列表语从句与不定式补语',explanation:'主干为the question is not A, but B。whether和which分别引出两个表语从句；allow them to retain中to retain是宾语them后的不定式补语。重点转向辅助的形式。'},

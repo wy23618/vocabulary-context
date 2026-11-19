@@ -22,7 +22,7 @@ This distinction has practical consequences. Teachers need to design tasks in wh
 async function draftFor(s,article=reading) {
   const {tokens}=await s.execute('tokenize_article',{article});
   // Deliberately labelled test fixture definitions; never available in runtime generation.
-  return {title:'Assistance and independent judgment',topic:'教育',article,word_map:tokens.map(t=>({token_index:t.index,lemma:t.surface_form.toLowerCase()==='retained'?'retain':t.surface_form.toLowerCase(),part_of_speech:t.surface_form.toLowerCase()==='retained'?'verb':'fixture',meaning:`测试释义：${t.surface_form}`,contextual_meaning:`测试语境：${t.index}`,collocation:''})),syntax_features:[],quality_checks:{naturalness_notes:'Test fixture, not a model evaluation.',argument_notes:'Test fixture for coverage and persistence.'}};
+  return {title:'Assistance and independent judgment',topic:'教育',article,word_map:tokens.map(t=>({token_index:t.index,phonetic:'/test/',lemma:t.surface_form.toLowerCase()==='retained'?'retain':t.surface_form.toLowerCase(),part_of_speech:t.surface_form.toLowerCase()==='retained'?'verb':'fixture',meaning:`测试释义：${t.surface_form}`,contextual_meaning:`测试语境：${t.index}`,collocation:''})),syntax_features:[],quality_checks:{naturalness_notes:'Test fixture, not a model evaluation.',argument_notes:'Test fixture for coverage and persistence.'}};
 }
 async function prepared(s,words='compelling retain diminish impose conventional') {await add(s,words);const sel=await selection(s,{auto_count:0});const {generation}=await call(s,'prepare_article',{selection_id:sel.id,config:{topic:'教育',length:'short'}});return generation;}
 
@@ -129,4 +129,17 @@ test('split article preparation preserves the whole locked selection and replaye
 });
 test('split preparation on a comfortable load creates one independently saveable complete part',async t=>{
   const {s}=setup(t);await add(s,'retain compelling');const sel=await selection(s,{auto_count:0});const {plan}=await call(s,'prepare_split_articles',{selection_id:sel.id,config:{length:'short'}});assert.equal(plan.parts.length,1);const {article}=await call(s,'save_article',{generation_id:plan.parts[0].id,draft:await draftFor(s)});assert.equal(article.plan_id,plan.id);assert.equal(article.part_index,0);assert.equal(article.part_count,1);assert.ok(article.coverage.every(c=>c.count===2));
+});
+
+test('missing IPA blocks new articles and legacy batch fills only missing values atomically',async t=>{
+  const {s}=setup(t);const generation=await prepared(s);const draft=await draftFor(s);delete draft.word_map[0].phonetic;
+  const validation=await s.execute('validate_article',{generation_id:generation.id,draft});assert.equal(validation.errors[0].code,'ARTICLE_PHONETIC');
+  await assert.rejects(call(s,'save_article',{generation_id:generation.id,draft}),{code:'ARTICLE_PHONETIC'});
+  draft.word_map[0].phonetic='/test/';const {article}=await call(s,'save_article',{generation_id:generation.id,draft});
+  const [first,second]=article.word_map;s.repository.put('article',article.lesson_id,{...article,word_map:article.word_map.map(m=>m.occurrence_id===first.occurrence_id?{...m,phonetic:''}:m)});
+  const items=[{occurrence_id:first.occurrence_id,phonetic:'/fixed/'},{occurrence_id:second.occurrence_id,phonetic:'/overwrite/'}];const request_id=randomUUID();
+  await assert.rejects(call(s,'save_article_phonetics',{lesson_id:article.lesson_id,items:[...items,{occurrence_id:'missing',phonetic:'/x/'}]}));
+  assert.equal((await s.execute('get_article',{lesson_id:article.lesson_id})).article.word_map[0].phonetic,'');
+  const result=await call(s,'save_article_phonetics',{lesson_id:article.lesson_id,items,request_id});assert.equal(result.updated,1);assert.equal(result.remaining,0);assert.deepEqual(await call(s,'save_article_phonetics',{lesson_id:article.lesson_id,items,request_id}),result);
+  const saved=(await s.execute('get_article',{lesson_id:article.lesson_id})).article;assert.equal(saved.word_map[0].phonetic,'/fixed/');assert.equal(saved.word_map[1].phonetic,second.phonetic);assert.equal(saved.article,article.article);
 });

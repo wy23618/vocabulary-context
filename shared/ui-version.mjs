@@ -1,1 +1,1 @@
-export const UI_VERSION = 19;
+export const UI_VERSION = 20;
