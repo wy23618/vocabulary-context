@@ -23,13 +23,13 @@ try{
    const batch=candidates.slice(offset,offset+10),day=Math.floor(offset/10);
    fixtureTime=new Date(new Date(`${date}T04:00:00Z`).getTime()-day*86400000);
    const staged=await service.execute('add_words',{text:batch.join('\n'),source:'SYSTEM',request_id:`${seedId}:stage:${day}`});
-   const result=await service.execute('confirm_import',{import_id:staged.import_id,items:staged.items.map((item,i)=>({id:item.id,word:item.word,included:true,level:(offset+i)%5,user_note:`测试数据 · ${seedId}`})),request_id:`${seedId}:confirm:${day}`});
+   const result=await service.execute('confirm_import',{import_id:staged.import_id,items:staged.items.map((item,i)=>({id:item.id,word:item.word,included:true,level:(offset+i)%5})),request_id:`${seedId}:confirm:${day}`});
    added.push(...result.words.map(w=>w.id));
    if(day>0&&day%2===0){
     for(let pass=0;pass<2;pass++){
      fixtureTime=new Date(fixtureTime.getTime()+3600000);
      const preview=await service.execute('add_words',{text:batch[4],source:'SYSTEM',request_id:`${seedId}:readd-stage:${day}:${pass}`});
-     await service.execute('confirm_import',{import_id:preview.import_id,items:preview.items.map(x=>({id:x.id,word:x.word,included:true,level:x.level,user_note:x.user_note||`测试数据 · ${seedId}`})),request_id:`${seedId}:readd-confirm:${day}:${pass}`});
+     await service.execute('confirm_import',{import_id:preview.import_id,items:preview.items.map(x=>({id:x.id,word:x.word,included:true,level:x.level,user_note:x.user_note})),request_id:`${seedId}:readd-confirm:${day}:${pass}`});
     }
     repeated++;
    }

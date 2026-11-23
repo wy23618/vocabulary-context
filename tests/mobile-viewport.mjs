@@ -23,9 +23,11 @@ assert.equal(bridgeCalls,1);
 assert.equal(await requestPresentation({...mockBridge,requestDisplayMode:async()=>({mode:'inline'})},'fullscreen',{}),'inline', 'Respect the mode actually granted');
 
 const dataDir=await mkdtemp(path.join(tmpdir(),'mobile-viewport-'));
-const service=createService({dataDir});
+const fixtureTime=new Date();
+const service=createService({dataDir,now:()=>fixtureTime});
 const batch=await service.execute('add_words',{text:'retain compelling diminish approach allocate amend assume benefit clarify define emerge engage expand focus generate identify imply maintain obtain persist refine resolve sustain verify',request_id:randomUUID()});
-await service.execute('confirm_import',{import_id:batch.import_id,items:batch.items,request_id:randomUUID()});
+const notes={allocate:'测试数据 · library-load-2026-10-14',approach:'个人笔记'};
+await service.execute('confirm_import',{import_id:batch.import_id,items:batch.items.map(item=>({...item,user_note:notes[item.word]??''})),request_id:randomUUID()});
 const browser=await chromium.launch({channel:'chrome',headless:true});
 const output='docs/previews';await mkdir(output,{recursive:true});
 try {
@@ -75,6 +77,10 @@ try {
           const pager=ui.getByRole('navigation',{name:'词库分页'});
           const next=ui.getByRole('button',{name:'下一页'});
           const previous=ui.getByRole('button',{name:'上一页'});
+          await expect(next).toContainText('下一页');
+          await expect(previous).toContainText('上一页');
+          await expect(list.locator('.word-row').filter({hasText:'allocate'})).not.toContainText('library-load');
+          await expect(list.locator('.word-row').filter({hasText:'approach'})).toContainText('个人笔记');
           const box=await list.boundingBox(), pagerBox=await pager.boundingBox();
           assert.ok(pagerBox.y+pagerBox.height<=box.y+1,'Pagination stays above the scrolling words');
           assert.ok(box.y+box.height<=composerTop,'All word rows can scroll above the composer');
