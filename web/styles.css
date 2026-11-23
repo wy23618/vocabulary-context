@@ -460,10 +460,10 @@ body{background:var(--page)}
 .direct-library .level-meter{gap:2px}.direct-library .level-meter i{width:5px;height:11px;border-radius:2px}.direct-library .level-meter span{font-size:9px;margin-left:3px}
 .direct-library .word-row>.row-more{flex-shrink:0}
 .direct-library .row-more summary{width:26px;min-height:36px;padding:5px 0;font-size:19px;color:var(--muted)}
-.direct-library .pagination{flex-shrink:0;grid-column:auto;grid-row:auto;min-height:48px;margin:0;padding:8px 0 0;border-top:1px solid var(--border);font-size:11px;gap:12px;background:var(--surface)}
+.direct-library .pagination{flex-shrink:0;grid-column:auto;grid-row:auto;min-height:48px;margin:0;padding:4px 0;border:0;border-bottom:1px solid var(--border);font-size:11px;gap:12px;background:var(--surface)}
 .direct-library .page-count{font-size:11px;width:auto}
 .direct-library .pagination select{min-height:32px;height:32px;font-size:11px;width:108px;padding:5px 25px 5px 9px;border-radius:7px}
-.direct-library .page-buttons{margin-left:auto;gap:8px}
+.direct-library .page-buttons{margin-left:0;gap:8px}
 .direct-library .page-buttons button{width:32px;height:32px;min-height:32px;padding:5px;border-radius:7px}
 .direct-library .page-buttons span{font-size:11px;min-width:32px}
 .direct-library .session-dock{display:flex;flex-direction:column;align-items:stretch;justify-content:flex-start;height:100%;min-height:0;gap:0;padding:24px 20px 14px;background:var(--surface);border:1px solid var(--border);border-radius:16px;box-shadow:var(--shadow)}
@@ -665,3 +665,37 @@ button.primary{box-shadow:none}button.primary:hover:enabled{box-shadow:none}
  .practice-grid>.article-configuration,.single-conversation>.conversation-form{padding:18px 24px}
 }
 @media(prefers-reduced-motion:reduce){.direct-library .word-row:has(.word-check:active){transform:none}}
+
+/* ChatGPT can float its composer over the fullscreen iframe. */
+.app-shell[data-display-mode=fullscreen] {
+  --fullscreen-bottom: max(clamp(56px, 12dvh, 96px), var(--host-safe-bottom, 0px), env(safe-area-inset-bottom));
+  border-bottom: var(--fullscreen-bottom) solid transparent;
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+}
+.app-shell[data-display-mode=fullscreen] .status-slot>.status-bar {
+  position: fixed;
+  margin-bottom: calc(var(--fullscreen-bottom) + max(0px, 100dvh - var(--app-height, 100dvh)));
+  margin-right: max(0px, (100vw - 1512px) / 2);
+}
+.app-shell[data-display-mode=fullscreen] > :is(.workspace, .reader-workspace) {
+  min-height: min(360px, 100dvh);
+}
+.app-shell[data-display-mode=fullscreen] > .direct-library {
+  min-height: min(560px, 100dvh);
+}
+.app-shell[data-display-mode=fullscreen] .library-main > .word-list {
+  overscroll-behavior-y: auto;
+}
+.direct-library .library-main>.word-list {
+  touch-action: pan-y pinch-zoom;
+}
+@media (pointer: coarse) {
+  .direct-library .pagination select,
+  .direct-library .page-buttons button {
+    min-height: 44px;
+  }
+  .direct-library .page-buttons button {
+    min-width: 44px;
+  }
+}
