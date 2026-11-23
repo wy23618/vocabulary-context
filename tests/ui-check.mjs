@@ -88,6 +88,7 @@ try {
   });
   await check('real generation handoff preserves pending state until actual saved article', async () => {
     await ui.getByRole('button', { name: '词库', exact: true }).click(); await ui.getByRole('button',{name:'清空勾选',exact:true}).click(); await ui.locator('.session-suggestions summary').click(); await ui.getByRole('button',{name:'选中今天的词',exact:true}).click(); await ui.getByRole('button',{name:'阅读',exact:true}).click(); await ui.getByLabel('篇幅', { exact: true }).selectOption('short');
+    await ui.getByRole('textbox', { name: '主题', exact: true }).fill('AI 与大学学习');
     await ui.getByRole('button', { name: '生成阅读' }).click(); await ui.getByRole('button', { name: '等待 ChatGPT 完成文章…' }).waitFor(); assert.equal((await service.execute('list_articles')).articles.length, 0); assert.ok(harness.messages.at(-1).content[0].text.includes('save_article'));
   });
   // Original development model-written article and occurrence glosses are not an app fallback.

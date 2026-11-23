@@ -17,6 +17,7 @@
     "test:tablet": "node tests/tablet-controls.mjs",
     "test:mobile-viewport": "node tests/mobile-viewport.mjs",
     "test:polish": "node tests/polish-ui.mjs",
+    "test:article-topic": "node tests/article-topic-ui.mjs",
     "test:flow": "node tests/session-flow.mjs",
     "test:studio": "node tests/studio-ui.mjs",
     "package": "node scripts/package.mjs",
